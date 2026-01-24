@@ -63,7 +63,7 @@ export default function Home() {
       <AppShell.Main pb={80}> {/* Padding bottom for mobile tabs if we had a bottom bar, but we use top tabs or simple switch */}
         <Container size="md" mt="md">
             <Tabs value={activeTab} onChange={setActiveTab} variant="default" radius="md" defaultValue="timer" keepMounted={false}>
-                <Tabs.List grow mb={32} style={{ borderBottom: 'none' }}>
+                <Tabs.List grow mb={50} style={{ borderBottom: 'none' }}>
                      <Paper withBorder radius="xl" p={4} bg="var(--mantine-color-gray-0)" w="100%">
                         <Group gap={0} grow>
                             <Button 
@@ -92,7 +92,7 @@ export default function Home() {
                      </Paper>
                 </Tabs.List>
 
-                <Tabs.Panel value="timer">
+                <Tabs.Panel value="timer" pt="xs">
                     <ServiceTimer onEntrySaved={() => setActiveTab('calendar')} />
                     
                     {/* Show today's stats below timer? */}

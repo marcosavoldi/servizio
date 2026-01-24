@@ -92,38 +92,49 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
       return '';
   }
 
+  const activeSegment = (view === 'day' && dayjs(currentDate).isSame(dayjs(), 'day')) 
+    ? 'today' 
+    : view;
+
   return (
     <>
       <Stack gap="md">
         <Card withBorder radius="md" p="sm">
           <Stack gap="sm">
               {/* Header with Navigation and View Switcher */}
-              <Group justify="space-between" align="center" wrap="wrap-reverse"> 
-                  <Group gap="xs">
-                      <Button variant="default" size="xs" onClick={handleToday}>Oggi</Button>
-                      <Group gap={4}>
-                          <ActionIcon variant="subtle" color="gray" onClick={handlePrev}>
-                              <IconChevronLeft size={18} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="gray" onClick={handleNext}>
-                              <IconChevronRight size={18} />
-                          </ActionIcon>
-                      </Group>
-                      <Text fw={700} size="lg" tt="capitalize" style={{ minWidth: 150 }}>
-                          {getViewLabel()}
-                      </Text>
-                  </Group>
-
+              <Stack gap="md">
                   <SegmentedControl 
-                      value={view}
-                      onChange={(val) => setView(val as CalendarViewType)}
+                      size="xs"
+                      value={activeSegment}
+                      onChange={(val) => {
+                          if (val === 'today') {
+                              handleToday();
+                              setView('day');
+                          } else {
+                              setView(val as CalendarViewType);
+                          }
+                      }}
                       data={[
                           { label: 'Mese', value: 'month' },
                           { label: 'Settimana', value: 'week' },
-                          { label: 'Giorno', value: 'day' }
+                          { label: 'Giorno', value: 'day' },
+                          { label: 'Oggi', value: 'today' }
                       ]}
+                      fullWidth
                   />
-              </Group>
+
+                  <Group justify="center" align="center" gap={4}>
+                      <ActionIcon variant="subtle" color="gray" onClick={handlePrev} size="lg">
+                          <IconChevronLeft size={28} />
+                      </ActionIcon>
+                      <Text fw={700} size="xl" tt="capitalize" style={{ textAlign: 'center', paddingLeft: 8, paddingRight: 8 }}>
+                          {getViewLabel()}
+                      </Text>
+                      <ActionIcon variant="subtle" color="gray" onClick={handleNext} size="lg">
+                          <IconChevronRight size={28} />
+                      </ActionIcon>
+                  </Group>
+              </Stack>
 
               {/* View Content */}
               {view === 'month' && (
