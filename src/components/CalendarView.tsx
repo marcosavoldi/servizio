@@ -24,6 +24,7 @@ interface CalendarViewProps {
 
 export default function CalendarView({ entries, onAddEntry }: CalendarViewProps) {
   const [view, setView] = useState<CalendarViewType>('month');
+  const [activeTab, setActiveTab] = useState<string>('month');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   
   // Edit logic
@@ -38,6 +39,7 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
       setCurrentDate(date);
       if (view === 'month') {
           setView('day');
+          setActiveTab('day'); // Default to generic day view on selection
       }
   }
   
@@ -67,15 +69,26 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
   const handleNext = () => {
       const unit = view === 'week' ? 'week' : view === 'day' ? 'day' : 'month';
       setCurrentDate(dayjs(currentDate).add(1, unit).toDate());
+      
+      // If we move, we are no longer in "Oggi" specific mode, but normal view mode
+      if (activeTab === 'today') {
+          setActiveTab('day');
+      }
   };
   
   const handlePrev = () => {
       const unit = view === 'week' ? 'week' : view === 'day' ? 'day' : 'month';
       setCurrentDate(dayjs(currentDate).subtract(1, unit).toDate());
+      
+      if (activeTab === 'today') {
+          setActiveTab('day');
+      }
   }
   
   const handleToday = () => {
       setCurrentDate(new Date());
+      // Explicit today action
+      setActiveTab('today');
   }
 
   const getViewLabel = () => {
@@ -92,10 +105,6 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
       return '';
   }
 
-  const activeSegment = (view === 'day' && dayjs(currentDate).isSame(dayjs(), 'day')) 
-    ? 'today' 
-    : view;
-
   return (
     <>
       <Stack gap="md">
@@ -105,8 +114,9 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
               <Stack gap="md">
                   <SegmentedControl 
                       size="xs"
-                      value={activeSegment}
+                      value={activeTab}
                       onChange={(val) => {
+                          setActiveTab(val);
                           if (val === 'today') {
                               handleToday();
                               setView('day');
@@ -155,6 +165,7 @@ export default function CalendarView({ entries, onAddEntry }: CalendarViewProps)
                       onSelectDate={(date) => {
                           setCurrentDate(date);
                           setView('day');
+                          setActiveTab('day');
                       }}
                   />
               )}
