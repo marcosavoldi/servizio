@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Text, Group, ActionIcon, Modal, Stack, Textarea, ThemeIcon, Divider, Badge } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconChecks, IconUserPlus, IconUser, IconClock } from '@tabler/icons-react';
 import { useAuth } from '../context/AuthContext';
-import { addServiceEntry } from '../services/firestore';
+import { addServiceEntry, saveTimerSession, deleteTimerSession, subscribeToActiveTimer } from '../services/firestore';
 import { Timestamp } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import { formatTime } from '../utils/formatUtils';
@@ -12,8 +12,6 @@ import AddContactModal from './AddContactModal';
 interface ServiceTimerWidgetProps {
     onEntrySaved?: () => void;
 }
-
-const STORAGE_KEY = 'service_timer_state';
 
 interface TimerState {
     status: 'idle' | 'running' | 'paused';
@@ -40,52 +38,61 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
     const [tempContacts, setTempContacts] = useState<Contact[]>([]);
     const [contactModalOpen, setContactModalOpen] = useState(false);
 
-    // Helper to save state
-    const saveState = (newState: Partial<TimerState>) => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        const currentState = stored ? JSON.parse(stored) : {};
-        const merged: TimerState = {
-            status,
-            startTime: startTimeRef.current,
-            accumulatedTime,
-            notes,
-            tempContacts,
-            ...currentState, // keep existing fields
-            ...newState      // overwrite with new
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    };
-
-    // Load state on mount
+    // Cloud Sync: Subscribe to active timer
     useEffect(() => {
-        const savedRaw = localStorage.getItem(STORAGE_KEY);
-        if (savedRaw) {
-            try {
-                const saved: TimerState = JSON.parse(savedRaw);
+        if (!user) return;
+        
+        const unsubscribe = subscribeToActiveTimer(user.uid, (remoteState) => {
+            if (remoteState) {
+                // We found an active session in the cloud!
+                const saved = remoteState as TimerState;
+                
                 setStatus(saved.status);
                 setAccumulatedTime(saved.accumulatedTime);
                 startTimeRef.current = saved.startTime;
                 
-                // Restore data
-                setNotes(saved.notes || '');
-                setTempContacts(saved.tempContacts || []);
+                // Only update notes if we are not currently editing (basic protection)
+                // Actually, for simplicity, we assume single-user-single-device active usage. 
+                // We overwrite local state to keep in sync.
+                if (saved.notes) setNotes(saved.notes);
+                if (saved.tempContacts) setTempContacts(saved.tempContacts);
 
                 if (saved.status === 'running' && saved.startTime) {
-                    // Calculate elapsed time including the time app was closed
-                    // elapsed = accumulated + (now - restartTime)
                     const currentSession = Math.floor((Date.now() - saved.startTime) / 1000);
                     setElapsed(saved.accumulatedTime + currentSession);
                 } else {
                     setElapsed(saved.accumulatedTime);
                 }
-            } catch (e) {
-                console.error("Failed to restore timer state", e);
-                localStorage.removeItem(STORAGE_KEY);
+            } else {
+                // No remote state. If we are 'idle', that's fine. 
+                // If we thought we were running, maybe another device stopped it? 
+                // We'll reset to idle if we were not in the middle of saving.
+                if (!isModalOpen) {
+                    setStatus('idle');
+                    setElapsed(0);
+                }
             }
-        }
-    }, []);
+        });
 
-    // Timer Interval
+        return () => unsubscribe();
+    }, [user, isModalOpen]);
+
+    const syncToCloud = (newState: Partial<TimerState>) => {
+        if (!user) return;
+        
+        // Construct current full state to save
+        const currentRefState: TimerState = {
+            status,
+            startTime: startTimeRef.current,
+            accumulatedTime,
+            notes,
+            tempContacts,
+            ...newState
+        };
+        saveTimerSession(user.uid, currentRefState);
+    };
+
+    // Timer Interval for UI ticking
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (status === 'running') {
@@ -103,21 +110,21 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
         const now = Date.now();
         setStatus('running');
         startTimeRef.current = now;
-        saveState({ status: 'running', startTime: now });
+        syncToCloud({ status: 'running', startTime: now });
     };
 
     const handlePause = () => {
         setStatus('paused');
         setAccumulatedTime(elapsed);
         startTimeRef.current = null;
-        saveState({ status: 'paused', accumulatedTime: elapsed, startTime: null });
+        syncToCloud({ status: 'paused', accumulatedTime: elapsed, startTime: null });
     };
 
     const handleResume = () => {
         const now = Date.now();
         setStatus('running');
         startTimeRef.current = now;
-        saveState({ status: 'running', startTime: now });
+        syncToCloud({ status: 'running', startTime: now });
     };
 
     const handleStop = () => {
@@ -125,11 +132,12 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
         setFinalTime(elapsed);
         setIsModalOpen(true);
         
-        // Clear running state logic but keep data for modal
         setElapsed(0);
         setAccumulatedTime(0);
         startTimeRef.current = null;
-        // Don't clear storage yet, wait for save/discard
+        // NOTE: We do NOT delete from cloud yet. We wait for Save or Discard.
+        // This protects the session if app crashes during save modal.
+        syncToCloud({ status: 'idle', accumulatedTime: elapsed, startTime: null });
     };
 
     const cleanUp = () => {
@@ -140,7 +148,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
         setTempContacts([]);
         setIsModalOpen(false);
         setStatus('idle');
-        localStorage.removeItem(STORAGE_KEY);
+        if (user) deleteTimerSession(user.uid);
     };
 
     const handleSave = async () => {
@@ -151,7 +159,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
             // Start time approximation
             const start = new Date(now.getTime() - finalTime * 1000);
             
-            // Optimistic Save: Race against a timeout to prevent hanging UI
+            // Optimistic Save
             const saveOp = addServiceEntry({
                 userId: user.uid,
                 date: dayjs(start).format('YYYY-MM-DD'),
@@ -163,8 +171,6 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                 contacts: tempContacts
             });
 
-            // If network is slow/offline, don't block UI for more than 2s. 
-            // Firebase handles the sync in background.
             const timeoutOp = new Promise(resolve => setTimeout(resolve, 2000));
             
             await Promise.race([saveOp, timeoutOp]);
@@ -173,8 +179,6 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
             cleanUp();
         } catch (error) {
             console.error("Error saving entry:", error);
-            // Even if error, if it's network related, we might want to close? 
-            // But real errors should alert. For now, standard alert.
             alert("Errore nel salvataggio o connessione assente.");
         } finally {
             setSaving(false);
@@ -184,20 +188,27 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
     const handleAddTempContact = (contact: Contact) => {
         const newContacts = [...tempContacts, contact];
         setTempContacts(newContacts);
-        saveState({ tempContacts: newContacts });
+        syncToCloud({ tempContacts: newContacts });
     };
 
     const handleNotesChange = (val: string) => {
         setNotes(val);
-        saveState({ notes: val });
+        // We sync on blur or we could debounce here. 
+        // For now, let's sync only on explicit actions or rely on blur? 
+        // Let's debounce sync inside the handler for better UX? 
+        // Actually simplest is just set local state. 
+        // We add a separate onBlur handler for the textarea to sync.
     };
+    
+    const handleNotesBlur = () => {
+        syncToCloud({ notes });
+    }
 
     return (
         <>
             <Card shadow="sm" radius="md" p="md" withBorder>
                 <Group justify="space-between" align="center">
                     
-                    {/* Left Side: Label or Status */}
                     <Group gap="sm">
                         {status === 'idle' ? (
                             <ThemeIcon variant="light" color="gray" size="lg" radius="md">
@@ -224,7 +235,6 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                         </Stack>
                     </Group>
 
-                    {/* Right Side: Controls */}
                     <Group gap="xs">
                         {status === 'idle' ? (
                             <ActionIcon 
@@ -279,7 +289,6 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                 </Group>
             </Card>
 
-            {/* Save Modal */}
             <Modal 
                 opened={isModalOpen} 
                 onClose={() => {}} 
@@ -303,6 +312,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                         placeholder="Note opzionali..."
                         value={notes}
                         onChange={(e) => handleNotesChange(e.currentTarget.value)}
+                        onBlur={handleNotesBlur}
                         minRows={3}
                         w="100%"
                     />

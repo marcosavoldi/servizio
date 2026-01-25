@@ -93,3 +93,27 @@ export const updateMonthlyGoal = async (userId: string, month: string, hours: nu
         }
     }, { merge: true });
 }
+
+// Timer Persistence
+export const saveTimerSession = async (userId: string, state: any) => {
+    // We store the session in a specific doc: users/{userId}/timer/active
+    const timerRef = doc(db, USERS_COLLECTION, userId, 'timer', 'active');
+    const { setDoc } = await import('firebase/firestore');
+    return setDoc(timerRef, { ...state, updatedAt: Timestamp.now() }, { merge: true });
+};
+
+export const deleteTimerSession = async (userId: string) => {
+    const timerRef = doc(db, USERS_COLLECTION, userId, 'timer', 'active');
+    return deleteDoc(timerRef);
+};
+
+export const subscribeToActiveTimer = (userId: string, callback: (state: any | null) => void) => {
+    const timerRef = doc(db, USERS_COLLECTION, userId, 'timer', 'active');
+    return onSnapshot(timerRef, (docSnap) => {
+        if (docSnap.exists()) {
+            callback(docSnap.data());
+        } else {
+            callback(null);
+        }
+    });
+};
