@@ -1,4 +1,4 @@
-import { AppShell, Burger, Group, Title, Button, Container, ActionIcon, Stack, NavLink, ScrollArea } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Container, ActionIcon, Stack, NavLink, ScrollArea, useMantineColorScheme } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../context/AuthContext';
 import CalendarView from '../components/CalendarView';
@@ -7,7 +7,7 @@ import ContactsView from '../components/ContactsView';
 import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
 import UserGuideView from '../components/UserGuideView';
-import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconCaretDown, IconPlus } from '@tabler/icons-react';
+import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconCaretDown, IconPlus, IconSun, IconMoon } from '@tabler/icons-react';
 import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact, addGlobalContact, getActiveTimer, saveTimerSession } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
@@ -20,6 +20,8 @@ import { Menu } from '@mantine/core';
 export default function Home() {
   const [opened, { toggle, close }] = useDisclosure();
   const { logout, user } = useAuth();
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const dark = colorScheme === 'dark';
   
   // Navigation
   const { currentView, navigate, goBack, goForward, canGoBack, canGoForward } = useInternalNavigation();
@@ -230,6 +232,16 @@ export default function Home() {
                 variant="light"
             />
         </Stack>
+
+        <Button 
+            variant="default" 
+            fullWidth 
+            mb="xs"
+            leftSection={dark ? <IconSun size={18} /> : <IconMoon size={18} />}
+            onClick={() => toggleColorScheme()}
+        >
+            {dark ? 'Tema Chiaro' : 'Tema Scuro'}
+        </Button>
 
         <Button variant="light" color="red" leftSection={<IconLogout size={18}/>} onClick={logout} fullWidth>
           Esci

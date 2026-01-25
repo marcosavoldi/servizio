@@ -1,11 +1,11 @@
-import { Accordion, Text, Title, List, Stack } from '@mantine/core';
-import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconTargetArrow } from '@tabler/icons-react';
+import { Accordion, Text, Title, List, Stack, ThemeIcon, Alert } from '@mantine/core';
+import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconTargetArrow, IconMenu2, IconSettings, IconPlus } from '@tabler/icons-react';
 
 export default function UserGuideView() {
     return (
         <Stack gap="lg">
              <Title order={3}>Manuale Utente</Title>
-             <Text c="dimmed">Benvenuto nella guida semplice per usare al meglio la tua Agenda Servizio.</Text>
+             <Text c="dimmed">Benvenuto nella guida completa della tua Agenda Servizio. Qui trovi tutto quello che c'è da sapere sulle funzionalità dell'app.</Text>
 
              <Accordion variant="separated" radius="md" chevronPosition="left">
                 
@@ -15,9 +15,41 @@ export default function UserGuideView() {
                     </Accordion.Control>
                     <Accordion.Panel>
                         <Text size="sm">
-                            Questa app ti aiuta a tenere traccia del tuo servizio, salvare gli orari, i contatti e le visite fatte. 
-                            È pensata per essere semplice: tutto quello che fai viene salvato automaticamente nel tuo telefono e, quando c'è internet, anche online.
+                            Questa applicazione è il tuo assistente personale per il servizio.
+                            Non è solo un cronometro, ma un vero e proprio gestionale per:
+                            <List size="sm" mt="xs" spacing={4} withPadding>
+                                <List.Item>Registrare il tempo di servizio.</List.Item>
+                                <List.Item>Gestire una <b>Rubrica Globale</b> dei tuoi contatti.</List.Item>
+                                <List.Item>Tenere traccia delle visite e delle pubblicazioni consegnate.</List.Item>
+                                <List.Item>Monitorare i tuoi obiettivi mensili.</List.Item>
+                            </List>
                         </Text>
+                    </Accordion.Panel>
+                </Accordion.Item>
+
+                <Accordion.Item value="header_menu">
+                    <Accordion.Control icon={<IconPlus size={20} color="green" />}>
+                        Il Menu "Nuovo" (in alto a destra)
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                        <Stack gap="xs">
+                            <Text size="sm">
+                                In alto a destra trovi un pulsante col simbolo <b>+</b>. Cliccandolo si apre un menu con due opzioni:
+                            </Text>
+                            <List size="sm" spacing="xs">
+                                <List.Item>
+                                    <b>Uscita Servizio</b>: Apre la finestra per inserire manualmente un rapporto (utile se hai dimenticato di avviare il timer o per giorni passati).
+                                </List.Item>
+                                <List.Item>
+                                    <b>Contatto</b>: Ti permette di creare una nuova scheda persona nella Rubrica.
+                                </List.Item>
+                            </List>
+                            <Alert variant="light" color="blue" title="Funzione Intelligente" mt="xs">
+                                <Text size="xs">
+                                    Se crei un <b>Nuovo Contatto</b> mentre il cronometro sta girando, quel contatto verrà automaticamente aggiunto alla tua sessione di servizio corrente!
+                                </Text>
+                            </Alert>
+                        </Stack>
                     </Accordion.Panel>
                 </Accordion.Item>
 
@@ -29,28 +61,39 @@ export default function UserGuideView() {
                         <Stack gap="xs">
                             <Text size="sm" fw={700}>Come registrare il tempo?</Text>
                             <List size="sm" spacing="xs">
-                                <List.Item>Nella Home (Panoramica), vedrai un riquadro con un tasto Play verde.</List.Item>
-                                <List.Item>Premi <b>Avvia</b> quando inizi il servizio.</List.Item>
-                                <List.Item>Se ti fermi per una pausa, premi il tasto <b>Pausa (Giallo)</b>. Il tempo si ferma.</List.Item>
-                                <List.Item>Quando hai finito, premi <b>Stop (Rosso)</b>.</List.Item>
-                                <List.Item>Si aprirà una finestra dove puoi scrivere due righe di note o aggiungere chi hai contattato.</List.Item>
-                                <List.Item>Premi "Salva" e le ore verranno aggiunte al tuo totale mensile!</List.Item>
+                                <List.Item>Dalla <b>Home</b>, premi il tasto <b>Play (Verde)</b> per iniziare.</List.Item>
+                                <List.Item>Usa <b>Pausa (Giallo)</b> se ti interrompi.</List.Item>
+                                <List.Item>Premi <b>Stop (Rosso)</b> quando hai finito la giornata.</List.Item>
                             </List>
-                             <Text size="sm" mt="xs" c="dimmed">Nota: Se chiudi l'app o spegni il telefono mentre il cronometro gira, non preoccuparti! Al riavvio troverai il tempo corretto.</Text>
+                            <Text size="sm">
+                                Al termine, vedrai un riepilogo. Potrai scrivere delle note generali e aggiungere le persone che hai contattato.
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                                Il timer è salvato online: puoi iniziarlo sul telefono e controllarlo dal tablet (se usi lo stesso account).
+                            </Text>
                         </Stack>
                     </Accordion.Panel>
                 </Accordion.Item>
 
-                <Accordion.Item value="goals">
-                    <Accordion.Control icon={<IconTargetArrow size={20} color="indigo" />}>
-                        I Tuoi Obiettivi
+                 <Accordion.Item value="contacts">
+                    <Accordion.Control icon={<IconUsers size={20} color="grape" />}>
+                        Rubrica Globale
                     </Accordion.Control>
                     <Accordion.Panel>
-                        <Text size="sm">
-                            Sotto al cronometro vedrai un cerchio che si riempie. 
-                            Quello indica quanto manca al tuo obiettivo mensile (che puoi impostare nelle Impostazioni).
-                            Ti dice chiaramente quante ore hai fatto, quante te ne mancano e quanti giorni restano alla fine del mese.
-                        </Text>
+                        <Stack gap="xs">
+                            <Text size="sm">
+                                L'app include una <b>Rubrica Unica</b> centralizzata.
+                                Ogni persona ha la sua scheda definitiva con:
+                            </Text>
+                            <List size="sm" spacing={4} withPadding>
+                                <List.Item>Dati anagrafici (Nome, Indirizzo, Telefono).</List.Item>
+                                <List.Item><b>Timeline Note</b>: Una storia cronologica di tutte le note che hai scritto su di lei.</List.Item>
+                            </List>
+                            <Text size="sm">
+                                Puoi accedere alla rubrica completa dal menu in basso o laterale ("Contatti").
+                                Quando aggiungi una visita nel calendario, cerchi semplicemente la persona dalla tua rubrica esistente.
+                            </Text>
+                        </Stack>
                     </Accordion.Panel>
                 </Accordion.Item>
 
@@ -60,27 +103,28 @@ export default function UserGuideView() {
                     </Accordion.Control>
                     <Accordion.Panel>
                         <Text size="sm">
-                           Qui vedi i giorni del mese. 
+                           Visualizza la tua attività mensile.
                            <List size="sm" mt={4} spacing={4}>
-                               <List.Item><b>Lineetta Verde</b>: Hai registrato del <b>Tempo</b> di servizio.</List.Item>
-                               <List.Item><b>Lineetta Rossa</b>: Hai registrato un <b>Contatto</b> o visita.</List.Item>
+                               <List.Item><b>Lineetta Verde</b>: Uscita di Servizio (Timer o Manuale).</List.Item>
+                               <List.Item><b>Lineetta Rossa</b>: Contatto registrato.</List.Item>
                            </List>
-                           Clicca su un giorno per vedere i dettagli: cosa hai fatto, le note e le visite.
-                           Puoi anche aggiungere manualmente un rapporto se ti sei dimenticato di usare il cronometro.
+                           Cliccando su un giorno puoi vedere i dettagli, modificare gli orari o aggiungere contatti a quella specifica visita (tramite il pulsante "Aggiungi contatto" nella scheda della visita).
                         </Text>
                     </Accordion.Panel>
                 </Accordion.Item>
 
-                 <Accordion.Item value="contacts">
-                    <Accordion.Control icon={<IconUsers size={20} color="grape" />}>
-                        Rubrica Contatti
+                <Accordion.Item value="settings">
+                    <Accordion.Control icon={<IconSettings size={20} color="gray" />}>
+                        Impostazioni
                     </Accordion.Control>
                     <Accordion.Panel>
                         <Text size="sm">
-                           Tieni traccia delle persone interessate. 
-                           Puoi salvare il nome, l'indirizzo e note importanti. 
-                           Dalla sezione <b>Contatti</b> (icona con due omini) puoi cercarli velocemente.
+                            Nella sezione Impostazioni puoi personalizzare la tua esperienza:
                         </Text>
+                        <List size="sm" mt="xs" spacing="xs">
+                            <List.Item><b>Catalogo Pubblicazioni</b>: Crea una lista delle riviste o brochure che usi più spesso, così potrai selezionarle velocemente invece di scriverle ogni volta.</List.Item>
+                            <List.Item><b>Obiettivo Mensile</b>: Imposta quante ore vorresti raggiungere ogni mese. Il cerchio nella Home ti mostrerà i tuoi progressi.</List.Item>
+                        </List>
                     </Accordion.Panel>
                 </Accordion.Item>
 
@@ -89,12 +133,22 @@ export default function UserGuideView() {
                         Funziona senza internet?
                     </Accordion.Control>
                     <Accordion.Panel>
-                        <Text size="sm">
-                           <b>Assolutamente sì.</b>
-                           Puoi usare l'app anche in modalità aereo o dove non c'è campo.
-                           Tutto viene salvato sul tuo telefono. Appena il telefono ritrova la connessione, l'app invierà tutto al sicuro nel cloud.
-                           Guarda l'icona della nuvoletta in alto a destra: se è Arancione sei offline (ma al sicuro), se è Verde è tutto sincronizzato.
-                        </Text>
+                        <Stack gap="xs">
+                            <Text size="sm">
+                               <b>Sì, puoi usare l'app ovunque.</b>
+                            </Text>
+                            <Text size="sm">
+                                Se non c'è campo, l'app salva tutto (timer, contatti, rapporti) nella memoria del telefono. Non perderai nulla.
+                            </Text>
+                            <Text size="sm">
+                                Appena torna internet, i dati vengono inviati automaticamente.
+                                Controlla l'icona della <b>Nuvoletta</b> in alto:
+                            </Text>
+                            <List size="sm" spacing={4} withPadding>
+                                <List.Item><b>Arancione</b>: Sei offline (dati salvati sul telefono).</List.Item>
+                                <List.Item><b>Verde</b>: Tutto sincronizzato online.</List.Item>
+                            </List>
+                        </Stack>
                     </Accordion.Panel>
                 </Accordion.Item>
 
