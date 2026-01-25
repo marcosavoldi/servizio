@@ -5,7 +5,10 @@ import { subscribeToUserSettings } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
 import type { ServiceEntry } from '../types';
 import dayjs from 'dayjs';
+import 'dayjs/locale/it';
 import { formatTimeHours } from '../utils/formatUtils';
+
+dayjs.locale('it');
 
 interface MonthlyGoalWidgetProps {
     entries: ServiceEntry[];
@@ -25,7 +28,8 @@ export default function MonthlyGoalWidget({ entries }: MonthlyGoalWidgetProps) {
         if (!user) return;
         const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
              const goals = settings.monthlyGoals || {};
-             setGoalHours(goals[currentMonthKey] || 0);
+             // Safe cast to number
+             setGoalHours(Number(goals[currentMonthKey] || 0));
         });
         return () => unsubscribe();
     }, [user, currentMonthKey]);
@@ -37,6 +41,9 @@ export default function MonthlyGoalWidget({ entries }: MonthlyGoalWidgetProps) {
     
     const realizedHours = totalSeconds / 3600;
     const percentage = goalHours > 0 ? Math.min((realizedHours / goalHours) * 100, 100) : 0;
+    // Handle NaN just in case
+    const safePercentage = isNaN(percentage) ? 0 : percentage;
+    
     const remainingSeconds = Math.max((goalHours * 3600) - totalSeconds, 0);
 
     if (goalHours === 0) {
@@ -70,19 +77,19 @@ export default function MonthlyGoalWidget({ entries }: MonthlyGoalWidgetProps) {
                  <BadgeDaysLeft days={daysRemaining} />
              </Group>
 
-             {/* Responsive Grid: Stacks on mobile, Side-by-side on larger screens */}
-             <Grid align="center" gutter="xl">
+             {/* Fix: Reduce gutter to avoid overflow on mobile */}
+             <Grid align="center" gutter="md">
                  <Grid.Col span={{ base: 12, xs: 5 }}>
                     <Center>
                          <RingProgress 
                             size={140}
                             thickness={12}
                             roundCaps
-                            sections={[{ value: percentage, color: 'indigo' }]}
+                            sections={[{ value: safePercentage, color: 'indigo' }]}
                             label={
                                 <Center>
                                     <Stack gap={0} align="center">
-                                        <Text fw={700} size="xl">{percentage.toFixed(0)}%</Text>
+                                        <Text fw={700} size="xl">{safePercentage.toFixed(0)}%</Text>
                                     </Stack>
                                 </Center>
                             }
