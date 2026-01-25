@@ -8,7 +8,8 @@ import {
     Timestamp,
     deleteDoc,
     doc,
-    updateDoc
+    updateDoc,
+    getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { ServiceEntry } from '../types';
@@ -128,6 +129,16 @@ export const subscribeToActiveTimer = (userId: string, callback: (state: any | n
             callback(null);
         }
     });
+};
+
+
+export const getActiveTimer = async (userId: string) => {
+    const timerRef = doc(db, USERS_COLLECTION, userId, 'timer', 'active');
+    const docSnap = await getDoc(timerRef);
+    if (docSnap.exists()) {
+        return docSnap.data();
+    }
+    return null;
 };
 
 // Global Contacts Management

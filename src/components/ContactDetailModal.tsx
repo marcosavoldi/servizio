@@ -1,5 +1,5 @@
-import { Modal, Group, Stack, Text, Switch, ActionIcon, Box, Badge, ScrollArea, Timeline, Textarea, Button, ThemeIcon, Accordion } from '@mantine/core';
-import { IconTrash, IconNote, IconPlus, IconMessageDots, IconX } from '@tabler/icons-react';
+import { Modal, Group, Stack, Text, Switch, ActionIcon, Box, Badge, ScrollArea, Textarea, Button, Accordion } from '@mantine/core';
+import { IconTrash, IconPlus } from '@tabler/icons-react';
 import { useState, useEffect, useMemo } from 'react';
 import type { Contact, ContactNote } from '../types';
 import CustomModalHeader from './common/CustomModalHeader';

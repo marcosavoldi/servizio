@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { formatDuration } from '../../utils/formatUtils';
 import AddContactModal from '../AddContactModal';
 import ContactDetailModal from '../ContactDetailModal';
-import { updateServiceEntry } from '../../services/firestore';
+import { updateServiceEntry, addGlobalContact } from '../../services/firestore';
+import { useAuth } from '../../context/AuthContext';
 
 interface CalendarDayViewProps {
   currentDate: Date;
@@ -18,6 +19,7 @@ interface CalendarDayViewProps {
 
 export default function CalendarDayView({ currentDate, entries, onEdit, onDelete }: CalendarDayViewProps) {
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const { user } = useAuth();
   
   const dateStr = dayjs(currentDate).format('YYYY-MM-DD');
   const dayEntries = entries.filter(e => e.date === dateStr);
@@ -37,12 +39,19 @@ export default function CalendarDayView({ currentDate, entries, onEdit, onDelete
   };
 
   const handleSaveContact = async (contact: Contact) => {
-      if (!selectedEntryForContact || !selectedEntryForContact.id) return;
-      
-      const currentContacts = selectedEntryForContact.contacts || [];
-      const updatedContacts = [...currentContacts, contact];
+      if (!selectedEntryForContact || !selectedEntryForContact.id || !user) return;
       
       try {
+           // 1. Save to Global Address Book
+           // eslint-disable-next-line @typescript-eslint/no-unused-vars
+           const { id, ...contactData } = contact;
+           const docRef = await addGlobalContact(user.uid, contactData);
+           const newGlobalContact = { ...contact, id: docRef.id };
+
+           // 2. Add to Service Entry
+           const currentContacts = selectedEntryForContact.contacts || [];
+           const updatedContacts = [...currentContacts, newGlobalContact];
+      
           await updateServiceEntry(selectedEntryForContact.id, {
               contacts: updatedContacts
           });

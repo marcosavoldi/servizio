@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Text, Group, ActionIcon, Modal, Stack, Textarea, ThemeIcon, Divider, Badge } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconChecks, IconUserPlus, IconUser, IconClock } from '@tabler/icons-react';
 import { useAuth } from '../context/AuthContext';
-import { addServiceEntry, saveTimerSession, deleteTimerSession, subscribeToActiveTimer } from '../services/firestore';
+import { addServiceEntry, saveTimerSession, deleteTimerSession, subscribeToActiveTimer, addGlobalContact } from '../services/firestore';
 import { Timestamp } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import { formatTime } from '../utils/formatUtils';
@@ -185,10 +185,24 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
         }
     };
 
-    const handleAddTempContact = (contact: Contact) => {
-        const newContacts = [...tempContacts, contact];
-        setTempContacts(newContacts);
-        syncToCloud({ tempContacts: newContacts });
+    const handleAddTempContact = async (contact: Contact) => {
+        if (!user) return;
+        
+        try {
+            // Strip the temporary local UUID
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, ...contactData } = contact;
+            
+            const docRef = await addGlobalContact(user.uid, contactData);
+            const newContact = { ...contact, id: docRef.id };
+            
+            const newContacts = [...tempContacts, newContact];
+            setTempContacts(newContacts);
+            syncToCloud({ tempContacts: newContacts });
+        } catch (error) {
+            console.error("Error adding global contact:", error);
+            alert("Errore durante il salvataggio del contatto.");
+        }
     };
 
     const handleNotesChange = (val: string) => {

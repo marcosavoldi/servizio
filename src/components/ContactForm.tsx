@@ -1,4 +1,4 @@
-import { TextInput, Textarea, Group, Button, Stack, MultiSelect, ScrollArea } from '@mantine/core';
+import { TextInput, Group, Button, Stack, MultiSelect, ScrollArea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';

@@ -7,13 +7,15 @@ import ContactsView from '../components/ContactsView';
 import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
 import UserGuideView from '../components/UserGuideView';
-import { IconCalendar, IconPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook } from '@tabler/icons-react';
-import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact } from '../services/firestore';
+import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconCaretDown, IconPlus } from '@tabler/icons-react';
+import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact, addGlobalContact, getActiveTimer, saveTimerSession } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
 import SettingsView from '../components/SettingsView';
 import { useInternalNavigation } from '../hooks/useInternalNavigation';
 import DashboardView from '../components/DashboardView';
+import AddContactModal from '../components/AddContactModal';
+import { Menu } from '@mantine/core';
 
 export default function Home() {
   const [opened, { toggle, close }] = useDisclosure();
@@ -22,7 +24,9 @@ export default function Home() {
   // Navigation
   const { currentView, navigate, goBack, goForward, canGoBack, canGoForward } = useInternalNavigation();
   
+  
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [addContactModalOpen, setAddContactModalOpen] = useState(false);
   const [entryDate, setEntryDate] = useState<Date | null>(null);
   const [entries, setEntries] = useState<ServiceEntry[]>([]);
   
@@ -43,6 +47,30 @@ export default function Home() {
   const handleOpenAddEntry = (date?: Date) => {
       setEntryDate(date || new Date());
       setManualModalOpen(true);
+  };
+
+  const handleCreateGlobalContact = async (contact: Contact) => {
+      if (!user) return;
+      try {
+           // 1. Add to Global Address Book
+           // eslint-disable-next-line @typescript-eslint/no-unused-vars
+           const { id, ...contactData } = contact;
+           const docRef = await addGlobalContact(user.uid, contactData);
+           const newGlobalContact = { ...contact, id: docRef.id };
+
+           // 2. Check for Active Timer and Add if exists
+           const activeTimer = await getActiveTimer(user.uid);
+           if (activeTimer) {
+               const currentTempContacts = activeTimer.tempContacts || [];
+               await saveTimerSession(user.uid, {
+                   tempContacts: [...currentTempContacts, newGlobalContact]
+               });
+           }
+
+      } catch(e) {
+          console.error("Error creating global contact", e);
+          alert("Errore creazione contatto");
+      }
   };
 
   const handleOpenContactDetail = (contact: Contact, entry: ServiceEntry | null) => {
@@ -138,15 +166,27 @@ export default function Home() {
                  >
                     <IconHome size={22} stroke={2.5} />
                  </ActionIcon>
-                 <ActionIcon 
-                    variant="light" 
-                    color="green" 
-                    size="lg" 
-                    radius="md" 
-                    onClick={() => handleOpenAddEntry()}
-                 >
-                    <IconPlus size={22} stroke={2.5} />
-                 </ActionIcon>
+                 <Menu shadow="md" width={200} position="bottom-end">
+                    <Menu.Target>
+                        <ActionIcon 
+                            variant="light" 
+                            color="green" 
+                            size="lg" 
+                            radius="md"
+                        >
+                            <IconPlus size={22} stroke={2.5} />
+                        </ActionIcon>
+                    </Menu.Target>
+
+                    <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconManualGearbox size={14} />} onClick={() => handleOpenAddEntry()}>
+                            Uscita Servizio
+                        </Menu.Item>
+                        <Menu.Item leftSection={<IconUserPlus size={14} />} onClick={() => setAddContactModalOpen(true)}>
+                            Contatto
+                        </Menu.Item>
+                    </Menu.Dropdown>
+                 </Menu>
              </Group>
         </Group>
       </AppShell.Header>
@@ -204,7 +244,7 @@ export default function Home() {
                 ) : currentView === 'calendar' ? (
                     <CalendarView entries={entries} onAddEntry={handleOpenAddEntry} />
                 ) : currentView === 'contacts' ? (
-                    <ContactsView entries={entries} onOpenContactDetail={handleOpenContactDetail} />
+                    <ContactsView onOpenContactDetail={handleOpenContactDetail} />
                 ) : currentView === 'guide' ? (
                     <UserGuideView />
                 ) : (
@@ -253,6 +293,12 @@ export default function Home() {
         contact={selectedContactForDetail}
         onUpdate={handleUpdateContact}
         onDelete={handleDeleteContact}
+      />
+
+      <AddContactModal
+        opened={addContactModalOpen}
+        onClose={() => setAddContactModalOpen(false)}
+        onSave={handleCreateGlobalContact}
       />
     </AppShell>
   );
