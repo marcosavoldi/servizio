@@ -1,4 +1,5 @@
 import { Card, Text, Stack, Group, Badge, ThemeIcon, ScrollArea, Menu, ActionIcon, Button, Divider } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import type { ServiceEntry, Contact } from '../../types';
 import dayjs from 'dayjs';
 import { IconClock, IconManualGearbox, IconDotsVertical, IconEdit, IconTrash, IconUserPlus, IconUser, IconSearch } from '@tabler/icons-react';
@@ -16,6 +17,7 @@ interface CalendarDayViewProps {
 }
 
 export default function CalendarDayView({ currentDate, entries, onEdit, onDelete }: CalendarDayViewProps) {
+  const isMobile = useMediaQuery('(max-width: 768px)');
   
   const dateStr = dayjs(currentDate).format('YYYY-MM-DD');
   const dayEntries = entries.filter(e => e.date === dateStr);
@@ -106,7 +108,7 @@ export default function CalendarDayView({ currentDate, entries, onEdit, onDelete
           <ScrollArea 
             type="always" 
             offsetScrollbars 
-            mah="calc(100vh - 150px)" 
+            mah={isMobile ? undefined : "calc(100vh - 150px)"}
             w="100%" 
             scrollbarSize={14}
             styles={{ thumb: { borderRadius: 8 } }}
