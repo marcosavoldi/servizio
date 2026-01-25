@@ -1,21 +1,37 @@
-import { Stack, Paper, Text, Group, TextInput, ActionIcon, Title, ScrollArea } from '@mantine/core';
-import { IconPlus, IconTrash, IconBook } from '@tabler/icons-react';
+import { Stack, Paper, Text, Group, TextInput, ActionIcon, Title, ScrollArea, NumberInput, Button } from '@mantine/core';
+import { MonthPickerInput } from '@mantine/dates';
+import { IconPlus, IconTrash, IconBook, IconTargetArrow } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
-import { updatePublicationCatalog, subscribeToUserSettings } from '../services/firestore';
+import { updatePublicationCatalog, subscribeToUserSettings, updateMonthlyGoal } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
+import dayjs from 'dayjs';
 
 export default function SettingsView() {
     const { user } = useAuth();
     const [catalog, setCatalog] = useState<string[]>([]);
     const [newItem, setNewItem] = useState('');
+    
+    // Monthly Goals State
+    const [selectedMonth, setSelectedMonth] = useState<Date | null>(new Date());
+    const [goalHours, setGoalHours] = useState<number | ''>('');
+    const [goalsMap, setGoalsMap] = useState<Record<string, number>>({});
 
     useEffect(() => {
         if (!user) return;
         const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
             setCatalog(settings.publicationCatalog);
+            setGoalsMap(settings.monthlyGoals);
         });
         return () => unsubscribe();
     }, [user]);
+
+    // Update input when month selection changes or goalsMap loads
+    useEffect(() => {
+        if (selectedMonth) {
+            const key = dayjs(selectedMonth).format('YYYY-MM');
+            setGoalHours(goalsMap[key] || '');
+        }
+    }, [selectedMonth, goalsMap]);
 
     const handleAdd = async () => {
         if (!newItem.trim() || !user) return;
@@ -30,8 +46,57 @@ export default function SettingsView() {
         await updatePublicationCatalog(user.uid, updated);
     };
 
+    const handleSaveGoal = async () => {
+        if (!user || !selectedMonth || goalHours === '') return;
+        const key = dayjs(selectedMonth).format('YYYY-MM');
+        await updateMonthlyGoal(user.uid, key, Number(goalHours));
+        // Optional: show notification?
+    };
+
     return (
         <Stack gap="md" h="100%">
+            
+            {/* Monthly Goals Section */}
+            <Paper p="md" radius="md" withBorder>
+                <Stack gap="sm">
+                    <Group align="center" gap="xs">
+                        <IconTargetArrow size={24} color="var(--mantine-color-teal-6)" />
+                        <Title order={4}>Obiettivo Mensile</Title>
+                    </Group>
+                    <Text size="sm" c="dimmed">
+                        Imposta le ore di servizio che vuoi raggiungere per un determinato mese.
+                    </Text>
+
+                    <Group align="end">
+                         <MonthPickerInput
+                            label="Mese"
+                            placeholder="Seleziona mese"
+                            value={selectedMonth}
+                            onChange={(date) => setSelectedMonth(date as Date | null)}
+                            style={{ flex: 1 }}
+                         />
+                         <NumberInput
+                            label="Ore Obiettivo"
+                            placeholder="50"
+                            min={0}
+                            value={goalHours}
+                            onChange={(val) => setGoalHours(val === '' ? '' : Number(val))}
+                            style={{ width: 100 }}
+                         />
+                         <Button onClick={handleSaveGoal} disabled={!selectedMonth || goalHours === ''} color="teal">
+                            Salva
+                         </Button>
+                    </Group>
+                    
+                    {selectedMonth && (
+                       <Text size="xs" c="dimmed" mt={4}>
+                           Attuale per {dayjs(selectedMonth).format('MMMM YYYY')}: <b>{goalsMap[dayjs(selectedMonth).format('YYYY-MM')] || '-'}</b> ore
+                       </Text>
+                    )}
+                </Stack>
+            </Paper>
+
+            {/* Catalog Section */}
             <Paper p="md" radius="md" withBorder>
                 <Stack gap="sm">
                     <Group align="center" gap="xs">
@@ -61,7 +126,7 @@ export default function SettingsView() {
 
             <Text fw={700} size="sm" mt="sm">Elenco Attuale ({catalog.length})</Text>
             
-            <ScrollArea h="calc(100vh - 300px)" type="auto" offsetScrollbars>
+            <ScrollArea h="calc(100vh - 450px)" type="auto" offsetScrollbars>
                 <Stack gap="xs">
                     {catalog.length === 0 ? (
                         <Text fs="italic" c="dimmed" size="sm">Nessuna pubblicazione salvata.</Text>

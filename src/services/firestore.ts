@@ -63,21 +63,33 @@ const USERS_COLLECTION = 'users';
 
 
 
-export const subscribeToUserSettings = (userId: string, callback: (settings: { publicationCatalog: string[] }) => void) => {
+export const subscribeToUserSettings = (userId: string, callback: (settings: { publicationCatalog: string[], monthlyGoals: Record<string, number> }) => void) => {
     return onSnapshot(doc(db, USERS_COLLECTION, userId), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            callback({ publicationCatalog: data.publicationCatalog || [] });
+            callback({
+                publicationCatalog: data.publicationCatalog || [],
+                monthlyGoals: data.monthlyGoals || {}
+            });
         } else {
-            callback({ publicationCatalog: [] });
+            callback({ publicationCatalog: [], monthlyGoals: {} });
         }
     });
 }
 
 export const updatePublicationCatalog = async (userId: string, catalog: string[]) => {
     const userRef = doc(db, USERS_COLLECTION, userId);
-    // Use set with merge to create if not exists or update
-    // We import setDoc
     const { setDoc } = await import('firebase/firestore');
     return setDoc(userRef, { publicationCatalog: catalog }, { merge: true });
+}
+
+export const updateMonthlyGoal = async (userId: string, month: string, hours: number) => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    const { setDoc } = await import('firebase/firestore');
+    // Use dot notation to update a specific key in the map without overwriting the whole map
+    return setDoc(userRef, {
+        monthlyGoals: {
+            [month]: hours
+        }
+    }, { merge: true });
 }

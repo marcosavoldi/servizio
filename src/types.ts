@@ -30,4 +30,5 @@ export interface ServiceEntry {
 
 export interface UserSettings {
     publicationCatalog?: string[];
+    monthlyGoals?: Record<string, number>; // key: "YYYY-MM", value: hours
 }
