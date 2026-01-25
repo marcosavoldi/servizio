@@ -129,3 +129,43 @@ export const subscribeToActiveTimer = (userId: string, callback: (state: any | n
         }
     });
 };
+
+// Global Contacts Management
+const CONTACTS_SUBCOLLECTION = 'contacts';
+
+export const subscribeToGlobalContacts = (userId: string, callback: (contacts: any[]) => void) => {
+    const q = query(
+        collection(db, USERS_COLLECTION, userId, CONTACTS_SUBCOLLECTION),
+        orderBy('lastName'),
+        orderBy('firstName')
+    );
+    return onSnapshot(q, (snapshot) => {
+        const contacts = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        callback(contacts);
+    });
+};
+
+export const addGlobalContact = async (userId: string, contact: Omit<any, 'id'>) => {
+    // Ensure we don't save undefined
+    const cleanContact = JSON.parse(JSON.stringify(contact));
+
+    return addDoc(collection(db, USERS_COLLECTION, userId, CONTACTS_SUBCOLLECTION), {
+        ...cleanContact,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    });
+};
+
+export const updateGlobalContact = async (userId: string, contactId: string, data: Partial<any>) => {
+    return updateDoc(doc(db, USERS_COLLECTION, userId, CONTACTS_SUBCOLLECTION, contactId), {
+        ...data,
+        updatedAt: new Date().toISOString()
+    });
+};
+
+export const deleteGlobalContact = async (userId: string, contactId: string) => {
+    return deleteDoc(doc(db, USERS_COLLECTION, userId, CONTACTS_SUBCOLLECTION, contactId));
+};

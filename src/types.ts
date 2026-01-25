@@ -11,8 +11,18 @@ export interface Contact {
     // Legacy: to be migrated to notes
     publications?: string;
     // New fields
-    notes?: string;
+    notes?: string | ContactNote[];
     deliveredPublications?: string[];
+
+    // Global Address Book Metadata
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface ContactNote {
+    id: string;
+    content: string;
+    createdAt: string;
 }
 
 export interface ServiceEntry {

@@ -11,7 +11,7 @@ export interface ContactFormValues {
     phone: string;
     mobile: string;
     email: string;
-    notes: string;
+    // notes removed
     deliveredPublications: string[];
 }
 
@@ -42,7 +42,6 @@ export default function ContactForm({ initialValues, onSave, onCancel, submitLab
             phone: initialValues?.phone || '',
             mobile: initialValues?.mobile || '',
             email: initialValues?.email || '',
-            notes: initialValues?.notes || '',
             deliveredPublications: initialValues?.deliveredPublications || []
         },
         validate: {
@@ -102,8 +101,6 @@ export default function ContactForm({ initialValues, onSave, onCancel, submitLab
                             required
                         />
                     )}
-
-                    <Textarea label="Note" placeholder="Dati sull'interesse..." {...form.getInputProps('notes')} minRows={3} />
 
                     <Group justify="flex-end" mt="md">
                         <Button variant="default" onClick={onCancel}>Annulla</Button>

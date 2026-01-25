@@ -1,43 +1,82 @@
-import { TextInput, Stack, Group, Paper, Text, Avatar, ActionIcon, ScrollArea } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
-import { IconSearch, IconX, IconCalendar } from '@tabler/icons-react';
-import { useState, useMemo } from 'react';
+import { TextInput, Stack, Group, Paper, Text, Avatar, ActionIcon, ScrollArea, Button, Alert } from '@mantine/core';
+import { IconSearch, IconX, IconDatabaseImport, IconInfoCircle } from '@tabler/icons-react';
+import { useState, useMemo, useEffect } from 'react';
 import type { ServiceEntry, Contact } from '../types';
 import dayjs from 'dayjs';
+import { useAuth } from '../context/AuthContext';
+import { subscribeToGlobalContacts } from '../services/firestore';
+import { migrateContactsToGlobalBook } from '../services/migration';
 
 interface ContactsViewProps {
     entries: ServiceEntry[];
-    onOpenContactDetail: (contact: Contact, entry: ServiceEntry) => void;
+    onOpenContactDetail: (contact: Contact, entry: ServiceEntry | null) => void;
 }
 
 export default function ContactsView({ entries, onOpenContactDetail }: ContactsViewProps) {
+    const { user } = useAuth();
     const [searchName, setSearchName] = useState('');
-    const [searchDate, setSearchDate] = useState<Date | null>(null);
+    
+    // Global Contacts
+    const [globalContacts, setGlobalContacts] = useState<Contact[]>([]);
+    const [isMigrating, setIsMigrating] = useState(false);
 
-    const allContacts = useMemo(() => {
-        return entries
-            .flatMap(entry => (entry.contacts || []).map(contact => ({ contact, entry })))
-            .sort((a, b) => b.entry.startTime.seconds - a.entry.startTime.seconds); // Most recent first
-    }, [entries]);
+    useEffect(() => {
+        if (!user) return;
+        return subscribeToGlobalContacts(user.uid, (data) => {
+            setGlobalContacts(data as Contact[]);
+        });
+    }, [user]);
+
+    const handleMigration = async () => {
+        if (!user) return;
+        if (!confirm("Avviare la migrazione? I contatti verranno unificati nella Rubrica Globale.")) return;
+        
+        setIsMigrating(true);
+        try {
+            const result = await migrateContactsToGlobalBook(user.uid);
+            alert(`Migrazione completata! Creati ${result.newContactsCount} nuovi contatti globali.`);
+        } catch (e) {
+            console.error(e);
+            alert("Errore durante la migrazione.");
+        } finally {
+            setIsMigrating(false);
+        }
+    };
 
     const filteredContacts = useMemo(() => {
-        return allContacts.filter(({ contact, entry }) => {
-            const matchesName = searchName.trim() === '' || 
+        return globalContacts.filter((contact) => {
+             const matchesName = searchName.trim() === '' || 
                 `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchName.toLowerCase());
-            
-            const matchesDate = !searchDate || 
-                entry.date === dayjs(searchDate).format('YYYY-MM-DD');
-
-            return matchesName && matchesDate;
+            return matchesName;
         });
-    }, [allContacts, searchName, searchDate]);
+    }, [globalContacts, searchName]);
 
     return (
         <Stack gap="md" h="100%">
+             {/* Migration Prompt if empty */}
+            {globalContacts.length === 0 && (
+                <Alert variant="light" color="blue" title="Rubrica Globale Vuota" icon={<IconInfoCircle />}>
+                    <Stack gap="xs">
+                        <Text size="sm">
+                            Sembra che tu non abbia ancora contatti nella nuova Rubrica Globale.
+                            Puoi importare automaticamente tutti i contatti dalle tue visite passate.
+                        </Text>
+                        <Button 
+                            leftSection={<IconDatabaseImport size={16} />} 
+                            onClick={handleMigration} 
+                            loading={isMigrating}
+                            size="xs"
+                        >
+                            Importa Contatti
+                        </Button>
+                    </Stack>
+                </Alert>
+            )}
+
             {/* Filters */}
             <Paper p="md" radius="md" withBorder>
                 <Stack gap="sm">
-                    <Text fw={700} size="lg">Elenco Contatti</Text>
+                    <Text fw={700} size="lg">Rubrica Contatti</Text>
                     <Group grow preventGrowOverflow={false} wrap="wrap">
                         <TextInput 
                             placeholder="Cerca per nome..." 
@@ -50,15 +89,6 @@ export default function ContactsView({ entries, onOpenContactDetail }: ContactsV
                                 : null
                             }
                         />
-                        <DateInput 
-                            placeholder="Filtra per data" 
-                            leftSection={<IconCalendar size={16} />}
-                            value={searchDate}
-                            onChange={(date) => setSearchDate(date as Date | null)}
-                            clearable
-                            locale="it"
-                            valueFormat="DD MMMM YYYY"
-                        />
                     </Group>
                 </Stack>
             </Paper>
@@ -66,29 +96,27 @@ export default function ContactsView({ entries, onOpenContactDetail }: ContactsV
             {/* List */}
             <ScrollArea h="calc(100vh - 200px)" type="always" offsetScrollbars>
                 {filteredContacts.length === 0 ? (
-                    <Text c="dimmed" ta="center" mt="xl">Nessun contatto trovato con questi filtri.</Text>
+                    <Text c="dimmed" ta="center" mt="xl">Nessun contatto trovato.</Text>
                 ) : (
                     <Stack gap="sm">
-                        {filteredContacts.map(({ contact, entry }, index) => (
+                        {filteredContacts.map((contact) => (
                             <Paper 
-                                key={`${contact.id}-${index}`} 
+                                key={contact.id} 
                                 p="sm" 
                                 radius="md" 
                                 withBorder 
                                 style={{ cursor: 'pointer', transition: 'background 0.2s' }}
-                                onClick={() => onOpenContactDetail(contact, entry)}
+                                onClick={() => onOpenContactDetail(contact, null)}
                                 bg="white"
                             >
                                 <Group justify="space-between" align="center">
                                     <Group gap="sm">
-                                        <Avatar color="blue" radius="xl">
+                                        <Avatar color="teal" radius="xl">
                                             {contact.firstName[0]?.toUpperCase()}{contact.lastName[0]?.toUpperCase()}
                                         </Avatar>
                                         <div>
                                             <Text fw={600} tt="capitalize">{contact.firstName} {contact.lastName}</Text>
-                                            <Text size="xs" c="dimmed">
-                                                Incontrato il {dayjs(entry.date).format('D MMMM YYYY')}
-                                            </Text>
+                                            {contact.address && <Text size="xs" c="dimmed">{contact.address}</Text>}
                                         </div>
                                     </Group>
                                     <IconSearch size={18} color="var(--mantine-color-gray-5)" />

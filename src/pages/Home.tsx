@@ -8,7 +8,7 @@ import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
 import UserGuideView from '../components/UserGuideView';
 import { IconCalendar, IconPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook } from '@tabler/icons-react';
-import { subscribeToMonthEntries, updateServiceEntry } from '../services/firestore';
+import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
 import SettingsView from '../components/SettingsView';
@@ -45,14 +45,28 @@ export default function Home() {
       setManualModalOpen(true);
   };
 
-  const handleOpenContactDetail = (contact: Contact, entry: ServiceEntry) => {
+  const handleOpenContactDetail = (contact: Contact, entry: ServiceEntry | null) => {
       setSelectedContactForDetail(contact);
       setSelectedEntryForDetail(entry);
       setDetailModalOpen(true);
   };
 
   const handleUpdateContact = async (updatedContact: Contact) => {
-      if (!selectedEntryForDetail || !selectedEntryForDetail.id) return;
+      if (!user) return;
+
+      // Case 1: Updating Global Contact (from Rubrica)
+      if (!selectedEntryForDetail) {
+          try {
+              await updateGlobalContact(user.uid, updatedContact.id, updatedContact);
+          } catch(e) {
+              console.error("Error updating global", e);
+              alert("Errore salvataggio contatto globale");
+          }
+          return;
+      }
+
+      // Case 2: Updating Entry Contact (Legacy/Embedded)
+      if (!selectedEntryForDetail.id) return;
       
       const currentContacts = selectedEntryForDetail.contacts || [];
       const updatedContacts = currentContacts.map(c => c.id === updatedContact.id ? updatedContact : c);
@@ -68,7 +82,23 @@ export default function Home() {
   };
 
   const handleDeleteContact = async () => {
-      if (!selectedEntryForDetail || !selectedEntryForDetail.id || !selectedContactForDetail) return;
+      if (!user) return;
+      if (!selectedContactForDetail) return;
+
+      // Case 1: Deleting Global Contact
+      if (!selectedEntryForDetail) {
+           try {
+              await deleteGlobalContact(user.uid, selectedContactForDetail.id);
+              setDetailModalOpen(false);
+           } catch(e) {
+               console.error("Error deleting global", e);
+               alert("Errore eliminazione contatto globale");
+           }
+           return;
+      }
+
+      // Case 2: Deleting Entry Contact
+      if (!selectedEntryForDetail.id) return;
       
       const currentContacts = selectedEntryForDetail.contacts || [];
       const updatedContacts = currentContacts.filter(c => c.id !== selectedContactForDetail.id);
