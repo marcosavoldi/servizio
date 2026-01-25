@@ -77,6 +77,7 @@ export default function SettingsView() {
                             value={selectedMonth}
                             onChange={(date) => setSelectedMonth(date as Date | null)}
                             style={{ flex: 1 }}
+                            locale="it"
                          />
                          <NumberInput
                             label="Ore Obiettivo"
