@@ -1,5 +1,5 @@
-import { Accordion, Text, Title, List, Stack, ThemeIcon, Alert } from '@mantine/core';
-import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconTargetArrow, IconMenu2, IconSettings, IconPlus } from '@tabler/icons-react';
+import { Accordion, Text, Title, List, Stack, Alert } from '@mantine/core';
+import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconSettings, IconPlus } from '@tabler/icons-react';
 
 export default function UserGuideView() {
     return (

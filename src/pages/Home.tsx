@@ -7,7 +7,7 @@ import ContactsView from '../components/ContactsView';
 import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
 import UserGuideView from '../components/UserGuideView';
-import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconCaretDown, IconPlus, IconSun, IconMoon } from '@tabler/icons-react';
+import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconPlus, IconSun, IconMoon } from '@tabler/icons-react';
 import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact, addGlobalContact, getActiveTimer, saveTimerSession } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
