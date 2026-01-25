@@ -6,7 +6,8 @@ import ManualEntryModal from '../components/ManualEntryModal';
 import ContactsView from '../components/ContactsView';
 import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
-import { IconCalendar, IconPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight } from '@tabler/icons-react';
+import UserGuideView from '../components/UserGuideView';
+import { IconCalendar, IconPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook } from '@tabler/icons-react';
 import { subscribeToMonthEntries, updateServiceEntry } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
@@ -144,6 +145,13 @@ export default function Home() {
                 onClick={() => { navigate('contacts'); toggle(); }}
                 variant="light"
             />
+             <NavLink 
+                label="Manuale Utente" 
+                leftSection={<IconBook size={20} />} 
+                active={currentView === 'guide'}
+                onClick={() => { navigate('guide'); toggle(); }}
+                variant="light"
+            />
             <NavLink 
                 label="Impostazioni" 
                 leftSection={<IconSettings size={20} />} 
@@ -166,6 +174,8 @@ export default function Home() {
                 <CalendarView entries={entries} onAddEntry={handleOpenAddEntry} />
             ) : currentView === 'contacts' ? (
                 <ContactsView entries={entries} onOpenContactDetail={handleOpenContactDetail} />
+            ) : currentView === 'guide' ? (
+                <UserGuideView />
             ) : (
                 <SettingsView />
             )}
