@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Text, Center, Stack, Modal, Textarea, Group, RingProgress, ThemeIcon } from '@mantine/core';
+import { Button, Card, Text, Center, Stack, Modal, Textarea, Group, RingProgress, ThemeIcon, Divider } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconPlayerPlay, IconPlayerStop, IconChecks } from '@tabler/icons-react';
+import { IconPlayerPlay, IconPlayerStop, IconChecks, IconUserPlus, IconUser } from '@tabler/icons-react';
 import { useAuth } from '../context/AuthContext';
 import { addServiceEntry } from '../services/firestore';
 import { Timestamp } from 'firebase/firestore';
 import dayjs from 'dayjs';
 
 import { formatTime } from '../utils/formatUtils';
+import type { Contact } from '../types';
+import AddContactModal from './AddContactModal';
 
 interface ServiceTimerProps {
   onEntrySaved: () => void;
@@ -24,6 +26,10 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
   const [finalTime, setFinalTime] = useState(0);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Contact Logic
+  const [tempContacts, setTempContacts] = useState<Contact[]>([]);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -52,6 +58,7 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
       setElapsed(0);
       startTimeRef.current = null;
       setNotes('');
+      setTempContacts([]);
       setIsModalOpen(false);
   }
 
@@ -72,6 +79,7 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
         duration: finalTime,
         type: 'timer',
         notes: notes.trim(),
+        contacts: tempContacts
       });
       
       onEntrySaved();
@@ -88,6 +96,10 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
       if(confirm("Sei sicuro di voler scartare questo tempo?")) {
         cleanUp();
       }
+  }
+
+  const handleAddTempContact = (contact: Contact) => {
+      setTempContacts(prev => [...prev, contact]);
   }
 
   return (
@@ -115,6 +127,34 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
               }
             />
           </Center>
+
+          {/* Contacts List during Timer */}
+          {tempContacts.length > 0 && (
+             <Stack gap="xs" w="100%">
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase" ta="center">Contatti aggiunti</Text>
+                {tempContacts.map(c => (
+                    <Card key={c.id} withBorder padding="xs" radius="sm">
+                        <Group>
+                            <ThemeIcon variant="light" color="blue" size="sm"><IconUser size={12}/></ThemeIcon>
+                            <Text size="sm">{c.firstName} {c.lastName}</Text>
+                        </Group>
+                    </Card>
+                ))}
+             </Stack>
+          )}
+
+          {/* Add Contact Button (Visible when running) */}
+          {isRunning && (
+              <Button 
+                variant="light" 
+                color="blue" 
+                size="xs" 
+                leftSection={<IconUserPlus size={14} />} 
+                onClick={() => setContactModalOpen(true)}
+              >
+                  Aggiungi Contatto
+              </Button>
+          )}
           
           {!isRunning ? (
              <Button 
@@ -181,12 +221,43 @@ export default function ServiceTimer({ onEntrySaved }: ServiceTimerProps) {
              minRows={4}
              mt="md"
           />
+
+           {/* Review Contacts in Save Screen too */}
+            {tempContacts.length > 0 && (
+                 <Stack gap="xs" mt="md">
+                    <Divider label="Contatti raccolti" labelPosition="center" />
+                    {tempContacts.map(c => (
+                        <Group key={c.id} gap="xs">
+                            <IconUser size={14} color="var(--mantine-color-gray-6)" />
+                            <Text size="sm">{c.firstName} {c.lastName}</Text>
+                        </Group>
+                    ))}
+                 </Stack>
+            )}
+
+             <Button 
+                variant="subtle" 
+                color="blue" 
+                size="xs" 
+                mt="sm"
+                leftSection={<IconUserPlus size={14} />} 
+                onClick={() => setContactModalOpen(true)}
+              >
+                  Aggiungi un altro contatto
+              </Button>
+
           <Group grow mt="xl">
-              <Button variant="subtle" color="gray" size="md" onClick={handleDiscard} disabled={saving}>Scarta</Button>
+              <Button variant="subtle" color="red" size="md" onClick={handleDiscard} disabled={saving}>Scarta</Button>
               <Button onClick={handleSave} loading={saving} color="teal" size="md">Salva servizio</Button>
           </Group>
         </Stack>
       </Modal>
+
+      <AddContactModal 
+        opened={contactModalOpen} 
+        onClose={() => setContactModalOpen(false)} 
+        onSave={handleAddTempContact} 
+      />
     </>
   );
 }

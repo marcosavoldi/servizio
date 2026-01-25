@@ -44,7 +44,8 @@ export default function CalendarMonthView({ currentDate, entries, onEdit, onDele
     const d = dayjs(date);
     const dateStr = d.format('YYYY-MM-DD');
     const dayEntries = entriesByDate[dateStr] || [];
-    const hasEntries = dayEntries.length > 0;
+    const hasService = dayEntries.length > 0;
+    const hasContacts = dayEntries.some(e => e.contacts && e.contacts.length > 0);
     
     return (
       <div 
@@ -56,14 +57,42 @@ export default function CalendarMonthView({ currentDate, entries, onEdit, onDele
             width: '100%', 
             height: '100%', 
             display: 'flex', 
+            flexDirection: 'column',
             alignItems: 'center', 
             justifyContent: 'center',
             cursor: 'pointer',
-            borderBottom: hasEntries ? '3px solid var(--mantine-color-teal-5)' : undefined,
-            borderRadius: hasEntries ? '0' : '4px' // Square bottom if underlined
+            position: 'relative'
         }}
       >
-        {d.date()}
+        <span>{d.date()}</span>
+        
+        {/* Indicators Container */}
+        <div style={{ 
+            position: 'absolute', 
+            bottom: 4, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 2, 
+            width: '100%', 
+            alignItems: 'center' 
+        }}>
+            {hasService && (
+                <div style={{ 
+                    width: '60%', 
+                    height: 3, 
+                    backgroundColor: 'var(--mantine-color-teal-5)', 
+                    borderRadius: 2 
+                }} />
+            )}
+            {hasContacts && (
+                <div style={{ 
+                    width: '60%', 
+                    height: 3, 
+                    backgroundColor: 'var(--mantine-color-red-5)', 
+                    borderRadius: 2 
+                }} />
+            )}
+        </div>
       </div>
     );
   };

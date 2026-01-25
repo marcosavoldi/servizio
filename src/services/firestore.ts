@@ -57,3 +57,27 @@ export const subscribeToMonthEntries = (
         callback(entries);
     });
 };
+
+// User Settings
+const USERS_COLLECTION = 'users';
+
+
+
+export const subscribeToUserSettings = (userId: string, callback: (settings: { publicationCatalog: string[] }) => void) => {
+    return onSnapshot(doc(db, USERS_COLLECTION, userId), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            callback({ publicationCatalog: data.publicationCatalog || [] });
+        } else {
+            callback({ publicationCatalog: [] });
+        }
+    });
+}
+
+export const updatePublicationCatalog = async (userId: string, catalog: string[]) => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    // Use set with merge to create if not exists or update
+    // We import setDoc
+    const { setDoc } = await import('firebase/firestore');
+    return setDoc(userRef, { publicationCatalog: catalog }, { merge: true });
+}

@@ -1,28 +1,38 @@
-import { AppShell, Burger, Group, Title, Button, Container, Tabs, Paper, ActionIcon } from '@mantine/core';
+import { AppShell, Burger, Group, Title, Button, Container, Tabs, Paper, ActionIcon, Stack, NavLink } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useAuth } from '../context/AuthContext';
 import ServiceTimer from '../components/ServiceTimer';
 import CalendarView from '../components/CalendarView';
 import ManualEntryModal from '../components/ManualEntryModal';
+import ContactsView from '../components/ContactsView';
+import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
-import { IconClock, IconCalendar, IconPlus } from '@tabler/icons-react';
-import { subscribeToMonthEntries } from '../services/firestore';
-import type { ServiceEntry } from '../types';
+import { IconClock, IconCalendar, IconPlus, IconUsers, IconHome, IconLogout, IconSettings } from '@tabler/icons-react';
+import { subscribeToMonthEntries, updateServiceEntry } from '../services/firestore';
+import type { ServiceEntry, Contact } from '../types';
+import SettingsView from '../components/SettingsView';
+
+type MainView = 'dashboard' | 'contacts' | 'settings';
 
 export default function Home() {
   const [opened, { toggle }] = useDisclosure();
   const { logout, user } = useAuth();
-
   
+  const [mainView, setMainView] = useState<MainView>('dashboard');
   const [activeTab, setActiveTab] = useState<string | null>('timer');
+  
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [entryDate, setEntryDate] = useState<Date | null>(null);
   const [entries, setEntries] = useState<ServiceEntry[]>([]);
   
-  // Fetch entries (simple: all user entries for now, optimize later)
+  // Contact Detail State (Shared)
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedContactForDetail, setSelectedContactForDetail] = useState<Contact | null>(null);
+  const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<ServiceEntry | null>(null);
+
+  // Fetch entries
   useEffect(() => {
     if (!user) return;
-    // For now, getting "Month" entries but we aren't filtering dates strictly in service yet, simplified to all recent.
     const unsubscribe = subscribeToMonthEntries(user.uid, new Date(), new Date(), (data) => {
         setEntries(data);
     });
@@ -32,6 +42,45 @@ export default function Home() {
   const handleOpenAddEntry = (date?: Date) => {
       setEntryDate(date || new Date());
       setManualModalOpen(true);
+  };
+
+  const handleOpenContactDetail = (contact: Contact, entry: ServiceEntry) => {
+      setSelectedContactForDetail(contact);
+      setSelectedEntryForDetail(entry);
+      setDetailModalOpen(true);
+  };
+
+  const handleUpdateContact = async (updatedContact: Contact) => {
+      if (!selectedEntryForDetail || !selectedEntryForDetail.id) return;
+      
+      const currentContacts = selectedEntryForDetail.contacts || [];
+      const updatedContacts = currentContacts.map(c => c.id === updatedContact.id ? updatedContact : c);
+      
+      try {
+          await updateServiceEntry(selectedEntryForDetail.id, {
+              contacts: updatedContacts
+          });
+      } catch (e) {
+          console.error("Error updating contact", e);
+          alert("Errore nell'aggiornamento del contatto");
+      }
+  };
+
+  const handleDeleteContact = async () => {
+      if (!selectedEntryForDetail || !selectedEntryForDetail.id || !selectedContactForDetail) return;
+      
+      const currentContacts = selectedEntryForDetail.contacts || [];
+      const updatedContacts = currentContacts.filter(c => c.id !== selectedContactForDetail.id);
+      
+      try {
+          await updateServiceEntry(selectedEntryForDetail.id, {
+              contacts: updatedContacts
+          });
+          setDetailModalOpen(false);
+      } catch (e) {
+          console.error("Error deleting contact", e);
+          alert("Errore nell'eliminazione del contatto");
+      }
   };
 
   return (
@@ -46,7 +95,6 @@ export default function Home() {
                 <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
                 <Title order={3} size="h4">Agenda Servizio</Title>
             </Group>
-            {/* Quick add button visible always? Or just in calendar? Put it in header for easy access */}
              <ActionIcon variant="filled" color="green" size="lg" radius="md" onClick={() => handleOpenAddEntry()}>
                 <IconPlus size={24} stroke={2.5} />
              </ActionIcon>
@@ -54,54 +102,82 @@ export default function Home() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <Title order={5} mb="md">Menu</Title>
-        <Button variant="light" color="red" onClick={logout} fullWidth>
+        <Stack gap="xs" style={{ flex: 1 }}>
+            <Title order={6} c="dimmed" tt="uppercase">Menu</Title>
+            <NavLink 
+                label="Home" 
+                leftSection={<IconHome size={20} />} 
+                active={mainView === 'dashboard'}
+                onClick={() => { setMainView('dashboard'); toggle(); }}
+                variant="light"
+            />
+            <NavLink 
+                label="Contatti" 
+                leftSection={<IconUsers size={20} />} 
+                active={mainView === 'contacts'}
+                onClick={() => { setMainView('contacts'); toggle(); }}
+                variant="light"
+            />
+            <NavLink 
+                label="Impostazioni" 
+                leftSection={<IconSettings size={20} />} 
+                active={mainView === 'settings'}
+                onClick={() => { setMainView('settings'); toggle(); }}
+                variant="light"
+            />
+        </Stack>
+
+        <Button variant="light" color="red" leftSection={<IconLogout size={18}/>} onClick={logout} fullWidth>
           Esci
         </Button>
       </AppShell.Navbar>
 
-      <AppShell.Main pb={80}> {/* Padding bottom for mobile tabs if we had a bottom bar, but we use top tabs or simple switch */}
-        <Container size="md" mt="md">
-            <Tabs value={activeTab} onChange={setActiveTab} variant="default" radius="md" defaultValue="timer" keepMounted={false}>
-                <Tabs.List grow mb={50} style={{ borderBottom: 'none' }}>
-                     <Paper withBorder radius="xl" p={4} bg="var(--mantine-color-gray-0)" w="100%">
-                        <Group gap={0} grow>
-                            <Button 
-                                variant={activeTab === 'timer' ? 'white' : 'subtle'} 
-                                color="gray" 
-                                radius="xl"
-                                size="sm"
-                                onClick={() => setActiveTab('timer')}
-                                leftSection={<IconClock size={16}/>}
-                                style={{ boxShadow: activeTab === 'timer' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                            >
-                                Oggi
-                            </Button>
-                            <Button 
-                                variant={activeTab === 'calendar' ? 'white' : 'subtle'} 
-                                color="gray" 
-                                radius="xl"
-                                size="sm"
-                                onClick={() => setActiveTab('calendar')}
-                                leftSection={<IconCalendar size={16}/>}
-                                style={{ boxShadow: activeTab === 'calendar' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-                            >
-                                Calendario
-                            </Button>
-                        </Group>
-                     </Paper>
-                </Tabs.List>
+      <AppShell.Main pb={80}>
+        <Container size="md" mt="md" p={0}>
+            {mainView === 'dashboard' ? (
+                <Tabs value={activeTab} onChange={setActiveTab} variant="default" radius="md" defaultValue="timer" keepMounted={false}>
+                    <Tabs.List grow mb={30} pb="lg" style={{ borderBottom: 'none' }}>
+                        <Paper withBorder radius="xl" p={4} bg="var(--mantine-color-gray-0)" w="100%">
+                            <Group gap={0} grow>
+                                <Button 
+                                    variant={activeTab === 'timer' ? 'white' : 'subtle'} 
+                                    color="gray" 
+                                    radius="xl"
+                                    size="sm"
+                                    onClick={() => setActiveTab('timer')}
+                                    leftSection={<IconClock size={16}/>}
+                                    style={{ boxShadow: activeTab === 'timer' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                                >
+                                    Oggi
+                                </Button>
+                                <Button 
+                                    variant={activeTab === 'calendar' ? 'white' : 'subtle'} 
+                                    color="gray" 
+                                    radius="xl"
+                                    size="sm"
+                                    onClick={() => setActiveTab('calendar')}
+                                    leftSection={<IconCalendar size={16}/>}
+                                    style={{ boxShadow: activeTab === 'calendar' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                                >
+                                    Calendario
+                                </Button>
+                            </Group>
+                        </Paper>
+                    </Tabs.List>
 
-                <Tabs.Panel value="timer" pt="xs">
-                    <ServiceTimer onEntrySaved={() => setActiveTab('calendar')} />
-                    
-                    {/* Show today's stats below timer? */}
-                </Tabs.Panel>
+                    <Tabs.Panel value="timer" pt="xs">
+                        <ServiceTimer onEntrySaved={() => setActiveTab('calendar')} />
+                    </Tabs.Panel>
 
-                <Tabs.Panel value="calendar">
-                    <CalendarView entries={entries} onAddEntry={handleOpenAddEntry} />
-                </Tabs.Panel>
-            </Tabs>
+                    <Tabs.Panel value="calendar">
+                        <CalendarView entries={entries} onAddEntry={handleOpenAddEntry} />
+                    </Tabs.Panel>
+                </Tabs>
+            ) : mainView === 'contacts' ? (
+                <ContactsView entries={entries} onOpenContactDetail={handleOpenContactDetail} />
+            ) : (
+                <SettingsView />
+            )}
         </Container>
       </AppShell.Main>
 
@@ -109,9 +185,15 @@ export default function Home() {
         opened={manualModalOpen} 
         onClose={() => setManualModalOpen(false)} 
         initialDate={entryDate}
-        onEntrySaved={() => {
-            // Refresh logic handled by subscription
-        }} 
+        onEntrySaved={() => {}} 
+      />
+
+      <ContactDetailModal 
+        opened={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        contact={selectedContactForDetail}
+        onUpdate={handleUpdateContact}
+        onDelete={handleDeleteContact}
       />
     </AppShell>
   );
