@@ -1,4 +1,4 @@
-import { Paper, Stack, Modal, ActionIcon, Group, Text, Box } from '@mantine/core';
+import { Paper, Stack, Modal, ActionIcon, Group, Text, Box, ScrollArea } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { Calendar } from '@mantine/dates';
 import type { ServiceEntry } from '../../types';
@@ -136,9 +136,11 @@ export default function CalendarMonthView({ currentDate, entries, onEdit, onDele
           onClose={() => setSelectedDayModal(null)} 
           withCloseButton={false}
           title={null}
-          centered
+          centered={!isMobile}
+          fullScreen={isMobile}
           size="lg"
-          padding={0} // We'll handle padding in the content
+          padding={0}
+          scrollAreaComponent={ScrollArea.Autosize}
       >
         <Stack gap="xs">
             {/* Custom Header */}

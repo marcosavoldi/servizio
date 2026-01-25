@@ -106,7 +106,7 @@ export default function CalendarDayView({ currentDate, entries, onEdit, onDelete
           <ScrollArea 
             type="always" 
             offsetScrollbars 
-            mah={600} 
+            mah="calc(100vh - 150px)" 
             w="100%" 
             scrollbarSize={14}
             styles={{ thumb: { borderRadius: 8 } }}
