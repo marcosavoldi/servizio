@@ -147,6 +147,14 @@ export default function SettingsView() {
                     )}
                 </Stack>
             </ScrollArea>
+
+            {/* Debug/Info Footer */}
+            <Stack gap={2} align="center" mt="auto" pt="md" opacity={0.5}>
+                <Text size="xs">Versione: v1.3.1</Text>
+                <Text size="xs">Account: {user?.email}</Text>
+                <Text size="xs" style={{ fontSize: 10 }}>UID: {user?.uid}</Text>
+                <Text size="xs" style={{ fontSize: 9 }}>Browser: {navigator.userAgent}</Text>
+            </Stack>
         </Stack>
     );
 }
