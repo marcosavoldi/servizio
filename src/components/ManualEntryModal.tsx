@@ -57,7 +57,8 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
             return;
         }
 
-      await addServiceEntry({
+      // Optimistic Save
+      const saveOp = addServiceEntry({
         userId: user.uid,
         date: dayjs(date).format('YYYY-MM-DD'),
         startTime: Timestamp.fromDate(start),
@@ -66,6 +67,9 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
         type: 'manual',
         notes: notes.trim(),
       });
+
+      const timeoutOp = new Promise(resolve => setTimeout(resolve, 2000));
+      await Promise.race([saveOp, timeoutOp]);
       
       onEntrySaved();
       onClose();

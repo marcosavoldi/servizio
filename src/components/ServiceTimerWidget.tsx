@@ -151,7 +151,8 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
             // Start time approximation
             const start = new Date(now.getTime() - finalTime * 1000);
             
-            await addServiceEntry({
+            // Optimistic Save: Race against a timeout to prevent hanging UI
+            const saveOp = addServiceEntry({
                 userId: user.uid,
                 date: dayjs(start).format('YYYY-MM-DD'),
                 startTime: Timestamp.fromDate(start),
@@ -161,12 +162,20 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                 notes: notes.trim(),
                 contacts: tempContacts
             });
+
+            // If network is slow/offline, don't block UI for more than 2s. 
+            // Firebase handles the sync in background.
+            const timeoutOp = new Promise(resolve => setTimeout(resolve, 2000));
+            
+            await Promise.race([saveOp, timeoutOp]);
             
             if (onEntrySaved) onEntrySaved();
             cleanUp();
         } catch (error) {
             console.error("Error saving entry:", error);
-            alert("Errore nel salvataggio.");
+            // Even if error, if it's network related, we might want to close? 
+            // But real errors should alert. For now, standard alert.
+            alert("Errore nel salvataggio o connessione assente.");
         } finally {
             setSaving(false);
         }
