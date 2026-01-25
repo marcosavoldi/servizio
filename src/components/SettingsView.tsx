@@ -5,6 +5,9 @@ import { useState, useEffect } from 'react';
 import { updatePublicationCatalog, subscribeToUserSettings, updateMonthlyGoal } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
 import dayjs from 'dayjs';
+import 'dayjs/locale/it';
+
+dayjs.locale('it');
 
 export default function SettingsView() {
     const { user } = useAuth();

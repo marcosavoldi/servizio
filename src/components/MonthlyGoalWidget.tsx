@@ -70,7 +70,7 @@ export default function MonthlyGoalWidget({ entries }: MonthlyGoalWidgetProps) {
                         <IconTargetArrow size={20} />
                     </ThemeIcon>
                     <Stack gap={0}>
-                        <Text size="xs" fw={700} c="dimmed" tt="uppercase">Obiettivo {now.format('MMMM')}</Text>
+                        <Text size="xs" fw={700} c="dimmed" tt="uppercase">Obiettivo {now.format('MMMM YYYY')}</Text>
                         <Text size="lg" fw={700}>{goalHours} Ore</Text>
                     </Stack>
                  </Group>
