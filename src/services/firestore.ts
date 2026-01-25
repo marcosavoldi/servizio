@@ -85,13 +85,25 @@ export const updatePublicationCatalog = async (userId: string, catalog: string[]
 
 export const updateMonthlyGoal = async (userId: string, month: string, hours: number) => {
     const userRef = doc(db, USERS_COLLECTION, userId);
-    const { setDoc } = await import('firebase/firestore');
-    // Use dot notation to update a specific key in the map without overwriting the whole map
-    return setDoc(userRef, {
-        monthlyGoals: {
-            [month]: hours
+    const { updateDoc, setDoc } = await import('firebase/firestore');
+
+    try {
+        // Try to update specifically this key using dot notation to avoid overwriting the map
+        await updateDoc(userRef, {
+            [`monthlyGoals.${month}`]: hours
+        });
+    } catch (e: any) {
+        // If document doesn't exist, create it
+        if (e.code === 'not-found') {
+            await setDoc(userRef, {
+                monthlyGoals: {
+                    [month]: hours
+                }
+            }, { merge: true });
+        } else {
+            throw e;
         }
-    }, { merge: true });
+    }
 }
 
 // Timer Persistence
