@@ -1,5 +1,5 @@
 import { Accordion, Text, Title, List, Stack, Alert } from '@mantine/core';
-import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconSettings, IconPlus } from '@tabler/icons-react';
+import { IconInfoCircle, IconClock, IconCalendar, IconUsers, IconWifiOff, IconSettings, IconPlus, IconFileDescription } from '@tabler/icons-react';
 
 export default function UserGuideView() {
     return (
@@ -115,16 +115,38 @@ export default function UserGuideView() {
 
                 <Accordion.Item value="settings">
                     <Accordion.Control icon={<IconSettings size={20} color="gray" />}>
-                        Impostazioni
+                        Impostazioni e Ruoli
                     </Accordion.Control>
                     <Accordion.Panel>
                         <Text size="sm">
-                            Nella sezione Impostazioni puoi personalizzare la tua esperienza:
+                            Nella sezione Impostazioni puoi personalizzare il tuo account in base alle tue esigenze mensili:
                         </Text>
                         <List size="sm" mt="xs" spacing="xs">
-                            <List.Item><b>Catalogo Pubblicazioni</b>: Crea una lista delle riviste o brochure che usi più spesso, così potrai selezionarle velocemente invece di scriverle ogni volta.</List.Item>
-                            <List.Item><b>Obiettivo Mensile</b>: Imposta quante ore vorresti raggiungere ogni mese. Il cerchio nella Home ti mostrerà i tuoi progressi.</List.Item>
+                            <List.Item><b>Obiettivo Mensile e Ruolo</b>: Scegli tu se essere Proclamatore o Pioniere (Ausiliario o Regolare) per ogni singolo mese. Il sistema adatterà il tuo obiettivo "Ore" di conseguenza.</List.Item>
+                            <List.Item><b>Monte Ore Arretrato</b>: Solo per i Pionieri Regolari appare una funzione per sommare ore dei mesi passati e calcolare perfettamente l'obiettivo annuale di 600h.</List.Item>
+                            <List.Item><b>Catalogo Pubblicazioni</b>: Crea una lista delle riviste o brochure che usi più spesso, così potrai selezionarle velocemente durante il servizio.</List.Item>
                         </List>
+                    </Accordion.Panel>
+                </Accordion.Item>
+
+                <Accordion.Item value="report">
+                    <Accordion.Control icon={<IconFileDescription size={20} color="teal" />}>
+                        Generazione Report PDF
+                    </Accordion.Control>
+                    <Accordion.Panel>
+                        <Stack gap="xs">
+                            <Text size="sm">
+                                L'app è in grado di compilare automaticamente il calcolo finale della tua attività:
+                            </Text>
+                            <List size="sm" spacing={4} withPadding>
+                                <List.Item>Entra in <b>Report PDF</b> dal menu laterale.</List.Item>
+                                <List.Item>Scegli il periodo di Date che desideri rendicontare.</List.Item>
+                                <List.Item>Il sistema mostrerà a video le uscite totali, le ore esatte calcolate e le copie esatte di pubblicazioni che hai consegnato (incrociandole con il tuo Catalogo).</List.Item>
+                            </List>
+                            <Text size="sm">
+                                Cliccando "Scarica PDF" otterrai un documento elegante e professionale con la tabella dei tuoi risultati, pronto all'uso!
+                            </Text>
+                        </Stack>
                     </Accordion.Panel>
                 </Accordion.Item>
 
