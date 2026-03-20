@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Evita la cache di index.html -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <!-- Script di invalida cache e reload al cambio versione -->
+    <script>
+      const APP_VERSION = '1.1.0'; // Modifica questo valore per forzare un reload globale
+      const currentVersion = localStorage.getItem('app_version');
+      if (currentVersion !== APP_VERSION) {
+        localStorage.setItem('app_version', APP_VERSION);
+        window.location.reload();
+      }
+    </script>
     <title>Agenda Servizio</title>
   </head>
   <body>

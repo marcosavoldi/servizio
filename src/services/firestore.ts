@@ -9,7 +9,8 @@ import {
     deleteDoc,
     doc,
     updateDoc,
-    getDoc
+    getDoc,
+    setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { ServiceEntry } from '../types';
@@ -64,43 +65,78 @@ const USERS_COLLECTION = 'users';
 
 
 
-export const subscribeToUserSettings = (userId: string, callback: (settings: { publicationCatalog: string[], monthlyGoals: Record<string, number> }) => void) => {
+export const subscribeToUserSettings = (userId: string, callback: (settings: { publicationCatalog: string[], monthlyGoals: Record<string, number>, monthlyRoles: Record<string, string>, yearlyArrears: Record<string, number> }) => void) => {
     return onSnapshot(doc(db, USERS_COLLECTION, userId), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             callback({
                 publicationCatalog: data.publicationCatalog || [],
-                monthlyGoals: data.monthlyGoals || {}
+                monthlyGoals: data.monthlyGoals || {},
+                monthlyRoles: data.monthlyRoles || {},
+                yearlyArrears: data.yearlyArrears || {}
             });
         } else {
-            callback({ publicationCatalog: [], monthlyGoals: {} });
+            callback({ publicationCatalog: [], monthlyGoals: {}, monthlyRoles: {}, yearlyArrears: {} });
         }
     });
 }
 
 export const updatePublicationCatalog = async (userId: string, catalog: string[]) => {
     const userRef = doc(db, USERS_COLLECTION, userId);
-    const { setDoc } = await import('firebase/firestore');
     return setDoc(userRef, { publicationCatalog: catalog }, { merge: true });
 }
 
 export const updateMonthlyGoal = async (userId: string, month: string, hours: number) => {
     const userRef = doc(db, USERS_COLLECTION, userId);
-    const { updateDoc, setDoc } = await import('firebase/firestore');
 
     try {
-        // Try to update specifically this key using dot notation to avoid overwriting the map
         await updateDoc(userRef, {
             [`monthlyGoals.${month}`]: hours
         });
     } catch (e: any) {
-        // If document doesn't exist, create it
         if (e.code === 'not-found') {
-            await setDoc(userRef, {
-                monthlyGoals: {
-                    [month]: hours
-                }
-            }, { merge: true });
+            await setDoc(userRef, { monthlyGoals: { [month]: hours } }, { merge: true });
+        } else {
+            throw e;
+        }
+    }
+}
+
+export const updateMonthlyRoleAndGoal = async (userId: string, month: string, role: string, hours?: number) => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+
+    const updateData: any = {
+        [`monthlyRoles.${month}`]: role
+    };
+    if (hours !== undefined) {
+        updateData[`monthlyGoals.${month}`] = hours;
+    }
+
+    try {
+        await updateDoc(userRef, updateData);
+    } catch (e: any) {
+        if (e.code === 'not-found') {
+            const initialData: any = { monthlyRoles: { [month]: role } };
+            if (hours !== undefined) {
+                initialData.monthlyGoals = { [month]: hours };
+            }
+            await setDoc(userRef, initialData, { merge: true });
+        } else {
+            throw e;
+        }
+    }
+}
+
+export const updateYearlyArrears = async (userId: string, year: string, hours: number) => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+
+    try {
+        await updateDoc(userRef, {
+            [`yearlyArrears.${year}`]: hours
+        });
+    } catch (e: any) {
+        if (e.code === 'not-found') {
+            await setDoc(userRef, { yearlyArrears: { [year]: hours } }, { merge: true });
         } else {
             throw e;
         }
@@ -111,7 +147,6 @@ export const updateMonthlyGoal = async (userId: string, month: string, hours: nu
 export const saveTimerSession = async (userId: string, state: any) => {
     // We store the session in a specific doc: users/{userId}/timer/active
     const timerRef = doc(db, USERS_COLLECTION, userId, 'timer', 'active');
-    const { setDoc } = await import('firebase/firestore');
     return setDoc(timerRef, { ...state, updatedAt: Timestamp.now() }, { merge: true });
 };
 

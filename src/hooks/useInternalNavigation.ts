@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type MainView = 'dashboard' | 'calendar' | 'contacts' | 'settings' | 'guide';
+export type MainView = 'dashboard' | 'calendar' | 'contacts' | 'report' | 'guide' | 'settings';
 
 export function useInternalNavigation(initialView: MainView = 'dashboard') {
     const [historyStack, setHistoryStack] = useState<MainView[]>([initialView]);

@@ -7,11 +7,12 @@ import ContactsView from '../components/ContactsView';
 import ContactDetailModal from '../components/ContactDetailModal';
 import { useState, useEffect } from 'react';
 import UserGuideView from '../components/UserGuideView';
-import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconPlus, IconSun, IconMoon } from '@tabler/icons-react';
+import { IconCalendar, IconUserPlus, IconUsers, IconHome, IconLogout, IconSettings, IconArrowLeft, IconArrowRight, IconBook, IconManualGearbox, IconPlus, IconSun, IconMoon, IconFileDescription } from '@tabler/icons-react';
 import { subscribeToMonthEntries, updateServiceEntry, updateGlobalContact, deleteGlobalContact, addGlobalContact, getActiveTimer, saveTimerSession } from '../services/firestore';
 import type { ServiceEntry, Contact } from '../types';
 import NetworkStatus from '../components/NetworkStatus';
 import SettingsView from '../components/SettingsView';
+import ReportView from '../components/ReportView';
 import { useInternalNavigation } from '../hooks/useInternalNavigation';
 import DashboardView from '../components/DashboardView';
 import AddContactModal from '../components/AddContactModal';
@@ -217,6 +218,13 @@ export default function Home() {
                 onClick={() => { navigate('contacts'); toggle(); }}
                 variant="light"
             />
+            <NavLink 
+                label="Report PDF" 
+                leftSection={<IconFileDescription size={20} />} 
+                active={currentView === 'report'}
+                onClick={() => { navigate('report'); toggle(); }}
+                variant="light"
+            />
              <NavLink 
                 label="Manuale Utente" 
                 leftSection={<IconBook size={20} />} 
@@ -257,6 +265,8 @@ export default function Home() {
                     <CalendarView entries={entries} onAddEntry={handleOpenAddEntry} />
                 ) : currentView === 'contacts' ? (
                     <ContactsView onOpenContactDetail={handleOpenContactDetail} />
+                ) : currentView === 'report' ? (
+                    <ReportView entries={entries} />
                 ) : currentView === 'guide' ? (
                     <UserGuideView />
                 ) : (

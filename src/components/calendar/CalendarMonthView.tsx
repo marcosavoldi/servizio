@@ -46,6 +46,7 @@ export default function CalendarMonthView({ currentDate, entries, onEdit, onDele
     const dayEntries = entriesByDate[dateStr] || [];
     const hasService = dayEntries.length > 0;
     const hasContacts = dayEntries.some(e => e.contacts && e.contacts.length > 0);
+    const isToday = d.isSame(dayjs(), 'day');
     
     return (
       <div 
@@ -61,10 +62,17 @@ export default function CalendarMonthView({ currentDate, entries, onEdit, onDele
             alignItems: 'center', 
             justifyContent: 'center',
             cursor: 'pointer',
-            position: 'relative'
+            position: 'relative',
+            backgroundColor: isToday ? 'var(--mantine-color-teal-0)' : undefined,
+            borderRadius: 8
         }}
       >
-        <span>{d.date()}</span>
+        <span style={{ 
+            fontWeight: isToday ? 700 : undefined, 
+            color: isToday ? 'var(--mantine-color-teal-7)' : undefined 
+        }}>
+            {d.date()}
+        </span>
         
         {/* Indicators Container */}
         <div style={{ 

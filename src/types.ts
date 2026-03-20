@@ -38,7 +38,23 @@ export interface ServiceEntry {
     createdAt: Timestamp;
 }
 
+export const UserRole = {
+    PROCLAMATORE: 'proclamatore',
+    AUSILIARIO_15: 'ausiliario_15',
+    AUSILIARIO_30: 'ausiliario_30',
+    REGOLARE: 'regolare'
+} as const;
+
+export const ROLE_GOALS: Record<string, number | null> = {
+    [UserRole.PROCLAMATORE]: null,
+    [UserRole.AUSILIARIO_15]: 15,
+    [UserRole.AUSILIARIO_30]: 30,
+    [UserRole.REGOLARE]: 50,
+};
+
 export interface UserSettings {
     publicationCatalog?: string[];
     monthlyGoals?: Record<string, number>; // key: "YYYY-MM", value: hours
+    monthlyRoles?: Record<string, string>; // key: "YYYY-MM", value: role
+    yearlyArrears?: Record<string, number>; // key: "YYYY", value: hours
 }

@@ -51,7 +51,7 @@ export default function ContactForm({ initialValues, onSave, onCancel, submitLab
 
     const handleSubmit = (values: typeof form.values) => {
         // Process publications: remove "Altro" and add custom value if present
-        let finalPublications = values.deliveredPublications.filter(p => p !== 'Altro');
+        const finalPublications = values.deliveredPublications.filter(p => p !== 'Altro');
         
         if (values.deliveredPublications.includes('Altro') && customPublication.trim()) {
             finalPublications.push(customPublication.trim());

@@ -1,9 +1,10 @@
-import { Stack, Paper, Text, Group, TextInput, ActionIcon, Title, ScrollArea, NumberInput, Button } from '@mantine/core';
+import { Stack, Paper, Text, Group, TextInput, ActionIcon, Title, ScrollArea, NumberInput, Button, Select, Divider } from '@mantine/core';
 import { MonthPickerInput } from '@mantine/dates';
-import { IconPlus, IconTrash, IconBook, IconTargetArrow } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconBook, IconTargetArrow, IconHistory } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
-import { updatePublicationCatalog, subscribeToUserSettings, updateMonthlyGoal } from '../services/firestore';
+import { updatePublicationCatalog, subscribeToUserSettings, updateMonthlyRoleAndGoal, updateYearlyArrears } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
+import { UserRole, ROLE_GOALS } from '../types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/it';
 
@@ -14,27 +15,47 @@ export default function SettingsView() {
     const [catalog, setCatalog] = useState<string[]>([]);
     const [newItem, setNewItem] = useState('');
     
-    // Monthly Goals State
+    // Monthly Goals & Roles State
     const [selectedMonth, setSelectedMonth] = useState<Date | null>(new Date());
     const [goalHours, setGoalHours] = useState<number | ''>('');
+    const [selectedRole, setSelectedRole] = useState<string>(UserRole.PROCLAMATORE);
     const [goalsMap, setGoalsMap] = useState<Record<string, number>>({});
+    const [rolesMap, setRolesMap] = useState<Record<string, string>>({});
+    
+    // Arrears
+    const [arrearsToAdd, setArrearsToAdd] = useState<number | ''>('');
+    const [currentArrears, setCurrentArrears] = useState<number>(0);
+    const [arrearsMap, setArrearsMap] = useState<Record<string, number>>({});
 
     useEffect(() => {
         if (!user) return;
         const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
             setCatalog(settings.publicationCatalog);
             setGoalsMap(settings.monthlyGoals);
+            setRolesMap(settings.monthlyRoles);
+            setArrearsMap(settings.yearlyArrears);
         });
         return () => unsubscribe();
     }, [user]);
 
-    // Update input when month selection changes or goalsMap loads
+    // Update input when month selection changes
     useEffect(() => {
         if (selectedMonth) {
             const key = dayjs(selectedMonth).format('YYYY-MM');
-            setGoalHours(goalsMap[key] || '');
+            const role = rolesMap[key] || UserRole.PROCLAMATORE;
+            setSelectedRole(role);
+            
+            const preset = ROLE_GOALS[role];
+            if (preset === null) {
+                setGoalHours(goalsMap[key] || '');
+            } else {
+                setGoalHours(preset);
+            }
+            
+            const yearKey = dayjs(selectedMonth).format('YYYY');
+            setCurrentArrears(arrearsMap[yearKey] || 0);
         }
-    }, [selectedMonth, goalsMap]);
+    }, [selectedMonth, goalsMap, rolesMap, arrearsMap]);
 
     const handleAdd = async () => {
         if (!newItem.trim() || !user) return;
@@ -50,10 +71,33 @@ export default function SettingsView() {
     };
 
     const handleSaveGoal = async () => {
-        if (!user || !selectedMonth || goalHours === '') return;
+        if (!user || !selectedMonth) return;
         const key = dayjs(selectedMonth).format('YYYY-MM');
-        await updateMonthlyGoal(user.uid, key, Number(goalHours));
-        // Optional: show notification?
+        
+        let hoursToSave: number | undefined = undefined;
+        const preset = ROLE_GOALS[selectedRole];
+        if (preset === null) {
+            if (goalHours !== '') hoursToSave = Number(goalHours);
+        } else {
+            hoursToSave = preset;
+        }
+        
+        await updateMonthlyRoleAndGoal(user.uid, key, selectedRole, hoursToSave);
+    };
+
+    const handleSaveArrears = async () => {
+        if (!user || !selectedMonth || arrearsToAdd === '' || arrearsToAdd === 0) return;
+        const year = dayjs(selectedMonth).format('YYYY');
+        const newTotal = currentArrears + Number(arrearsToAdd);
+        await updateYearlyArrears(user.uid, year, newTotal);
+        setArrearsToAdd('');
+    };
+
+    const formatSavedRole = (roleVal: string) => {
+        if (roleVal === UserRole.REGOLARE) return 'Regolare';
+        if (roleVal === UserRole.AUSILIARIO_30) return 'Ausiliario 30h';
+        if (roleVal === UserRole.AUSILIARIO_15) return 'Ausiliario 15h';
+        return 'Proclamatore';
     };
 
     return (
@@ -64,10 +108,10 @@ export default function SettingsView() {
                 <Stack gap="sm">
                     <Group align="center" gap="xs">
                         <IconTargetArrow size={24} color="var(--mantine-color-teal-6)" />
-                        <Title order={4}>Obiettivo Mensile</Title>
+                        <Title order={4}>Obiettivo Mensile e Ruolo</Title>
                     </Group>
                     <Text size="sm" c="dimmed">
-                        Imposta le ore di servizio che vuoi raggiungere per un determinato mese.
+                        Imposta il tuo ruolo per un determinato mese per calcolare correttamente gli obiettivi mensili o annuali.
                     </Text>
 
                     <Group align="end">
@@ -76,26 +120,76 @@ export default function SettingsView() {
                             placeholder="Seleziona mese"
                             value={selectedMonth}
                             onChange={(date) => setSelectedMonth(date as Date | null)}
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, minWidth: 150 }}
                             locale="it"
                          />
-                         <NumberInput
-                            label="Ore Obiettivo"
-                            placeholder="50"
-                            min={0}
-                            value={goalHours}
-                            onChange={(val) => setGoalHours(val === '' ? '' : Number(val))}
-                            style={{ width: 100 }}
+                         <Select
+                            label="Ruolo"
+                            value={selectedRole}
+                            onChange={(val) => {
+                                if (val) {
+                                    setSelectedRole(val);
+                                    const preset = ROLE_GOALS[val];
+                                    setGoalHours(preset === null ? '' : preset);
+                                }
+                            }}
+                            data={[
+                                { value: UserRole.PROCLAMATORE, label: 'Proclamatore' },
+                                { value: UserRole.AUSILIARIO_15, label: 'Pioniere Ausiliario (15h)' },
+                                { value: UserRole.AUSILIARIO_30, label: 'Pioniere Ausiliario (30h)' },
+                                { value: UserRole.REGOLARE, label: 'Pioniere Regolare 600h annuali (50h media mensile)' },
+                            ]}
+                            style={{ flex: 1, minWidth: 200 }}
                          />
-                         <Button onClick={handleSaveGoal} disabled={!selectedMonth || goalHours === ''} color="teal">
+                         
+                         {selectedRole === UserRole.PROCLAMATORE && (
+                             <NumberInput
+                                label="Ore Obiettivo"
+                                placeholder="..."
+                                min={0}
+                                value={goalHours}
+                                onChange={(val) => setGoalHours(val === '' ? '' : Number(val))}
+                                style={{ width: 100 }}
+                             />
+                         )}
+                         <Button onClick={handleSaveGoal} disabled={!selectedMonth || (selectedRole === UserRole.PROCLAMATORE && goalHours === '')} color="teal">
                             Salva
                          </Button>
                     </Group>
                     
                     {selectedMonth && (
                        <Text size="xs" c="dimmed" mt={4}>
-                           Attuale per {dayjs(selectedMonth).format('MMMM YYYY')}: <b>{goalsMap[dayjs(selectedMonth).format('YYYY-MM')] || '-'}</b> ore
+                           Salvato per {dayjs(selectedMonth).format('MMMM YYYY')}: Ruolo <b>{formatSavedRole(rolesMap[dayjs(selectedMonth).format('YYYY-MM')])}</b> ({goalsMap[dayjs(selectedMonth).format('YYYY-MM')] || '-'} ore)
                        </Text>
+                    )}
+
+                    {selectedRole === UserRole.REGOLARE && (
+                        <>
+                            <Divider my="sm" />
+                            
+                            <Group align="center" gap="xs">
+                                <IconHistory size={24} color="var(--mantine-color-orange-6)" />
+                                <Title order={4}>Monte Ore Arretrato ({selectedMonth ? dayjs(selectedMonth).format('YYYY') : ''})</Title>
+                            </Group>
+                            <Text size="sm" c="dimmed">
+                                Se hai iniziato a usare l'app da poco, puoi inserire qui le ore dei mesi passati per allineare l'obiettivo annuale (600h). Puoi usare numeri negativi per sottrarre.
+                            </Text>
+                            <Group align="end">
+                                 <NumberInput
+                                    label="Aggiungi ore arretrate"
+                                    placeholder="Es. 15"
+                                    value={arrearsToAdd}
+                                    onChange={(val) => setArrearsToAdd(val === '' ? '' : Number(val))}
+                                    style={{ flex: 1, maxWidth: 200 }}
+                                 />
+                                 <Button onClick={handleSaveArrears} disabled={!selectedMonth || arrearsToAdd === '' || arrearsToAdd === 0} color="orange">
+                                    Aggiungi
+                                 </Button>
+                            </Group>
+                            <Text size="xs" fw={500} mt="xs">
+                                Totale arretrati salvati per il {selectedMonth ? dayjs(selectedMonth).format('YYYY') : ''}: <Text span c="orange" fw={700}>{currentArrears} ore</Text>
+                            </Text>
+                        </>
                     )}
                 </Stack>
             </Paper>

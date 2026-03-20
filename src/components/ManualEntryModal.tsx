@@ -48,7 +48,7 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
         const start = dayjs(date).hour(sh).minute(sm).second(0).toDate();
         const end = dayjs(date).hour(eh).minute(em).second(0).toDate();
         
-        let duration = (end.getTime() - start.getTime()) / 1000;
+        const duration = (end.getTime() - start.getTime()) / 1000;
         if (duration < 0) {
             // Assume next day if end time is before start time (night shift?) 
             // - Simplified: just alert user for now to check dates
