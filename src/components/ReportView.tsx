@@ -1,16 +1,18 @@
 import { Stack, Paper, Title, Group, Button, Text, Grid, Table } from '@mantine/core';
-import { DatePickerInput, Calendar } from '@mantine/dates';
+import { DatePickerInput } from '@mantine/dates';
 import { IconFileDescription, IconDownload } from '@tabler/icons-react';
 import { useState, useEffect, useMemo } from 'react';
-import html2canvas from 'html2canvas';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserSettings } from '../services/firestore';
 import type { ServiceEntry } from '../types';
 import dayjs from 'dayjs';
+import 'dayjs/locale/it';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UserRole } from '../types';
 import { formatTimeHours } from '../utils/formatUtils';
+
+dayjs.locale('it');
 
 interface ReportViewProps {
     entries: ServiceEntry[];
@@ -19,13 +21,11 @@ interface ReportViewProps {
 export default function ReportView({ entries }: ReportViewProps) {
     const { user } = useAuth();
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([dayjs().startOf('month').toDate(), dayjs().endOf('month').toDate()]);
-    const [catalog, setCatalog] = useState<string[]>([]);
     const [rolesMap, setRolesMap] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!user) return;
         const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
-            setCatalog(settings.publicationCatalog || []);
             setRolesMap(settings.monthlyRoles || {});
         });
         return () => unsubscribe();
@@ -38,62 +38,10 @@ export default function ReportView({ entries }: ReportViewProps) {
         return 'Proclamatore';
     };
 
-    const entriesByDate = useMemo(() => {
-        return entries.reduce((acc, entry) => {
-            if (!acc[entry.date]) acc[entry.date] = [];
-            acc[entry.date].push(entry);
-            return acc;
-        }, {} as Record<string, ServiceEntry[]>);
-    }, [entries]);
-
-    const renderDay = (date: Date) => {
-        const d = dayjs(date);
-        const dateStr = d.format('YYYY-MM-DD');
-        const dayEntries = entriesByDate[dateStr] || [];
-        const hasService = dayEntries.length > 0;
-        const hasContacts = dayEntries.some(e => e.contacts && e.contacts.length > 0);
-        const isToday = d.isSame(dayjs(), 'day');
-        
-        return (
-            <div 
-                style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    position: 'relative',
-                    backgroundColor: isToday ? 'var(--mantine-color-teal-0)' : undefined,
-                    borderRadius: 8
-                }}
-            >
-                <span style={{ 
-                    fontWeight: isToday ? 700 : undefined, 
-                    color: isToday ? 'var(--mantine-color-teal-7)' : undefined 
-                }}>
-                    {d.date()}
-                </span>
-                
-                {/* Indicators Container */}
-                <div style={{ 
-                    position: 'absolute', 
-                    bottom: 4, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: 2, 
-                    width: '100%', 
-                    alignItems: 'center' 
-                }}>
-                    {hasService && (
-                        <div style={{ width: '60%', height: 3, backgroundColor: 'var(--mantine-color-teal-5)', borderRadius: 2 }} />
-                    )}
-                    {hasContacts && (
-                        <div style={{ width: '60%', height: 3, backgroundColor: 'var(--mantine-color-red-5)', borderRadius: 2 }} />
-                    )}
-                </div>
-            </div>
-        );
+    const formatDuration = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return `${h}h ${m}min`;
     };
 
     const reportData = useMemo(() => {
@@ -108,6 +56,13 @@ export default function ReportView({ entries }: ReportViewProps) {
             return (d.isAfter(start) || d.isSame(start, 'day')) && (d.isBefore(end) || d.isSame(end, 'day'));
         });
 
+        // Sort chronologically (oldest first)
+        filteredEntries.sort((a, b) => {
+            const dateCompare = a.date.localeCompare(b.date);
+            if (dateCompare !== 0) return dateCompare;
+            return a.startTime.toMillis() - b.startTime.toMillis();
+        });
+
         const totalEntriesCount = filteredEntries.length;
 
         // 2. Tally hours
@@ -115,11 +70,9 @@ export default function ReportView({ entries }: ReportViewProps) {
 
         // 3. Gather Roles during this period
         let currentMonthIter = start.startOf('month');
-        const coveredMonthDates: Date[] = [];
         const coveredMonths: string[] = [];
         while (currentMonthIter.isBefore(end) || currentMonthIter.isSame(end, 'month')) {
             coveredMonths.push(currentMonthIter.format('YYYY-MM'));
-            coveredMonthDates.push(currentMonthIter.toDate());
             currentMonthIter = currentMonthIter.add(1, 'month');
         }
         
@@ -127,62 +80,57 @@ export default function ReportView({ entries }: ReportViewProps) {
         const uniqueRoles = Array.from(new Set(rolesInPeriod));
         const rolesString = uniqueRoles.map(formatRoleName).join(', ');
 
-        // 4. Gather Publications
-        const pubsCount: Record<string, number> = {};
-        
-        // Ensure catalog entries exist initialized to 0
-        catalog.forEach(cat => pubsCount[cat] = 0);
-        
-        filteredEntries.forEach(entry => {
-            if (entry.contacts) {
-                entry.contacts.forEach(contact => {
-                    if (contact.deliveredPublications) {
-                        contact.deliveredPublications.forEach(pub => {
-                            if (pubsCount[pub] !== undefined) {
-                                pubsCount[pub]++;
-                            } else {
-                                pubsCount[pub] = (pubsCount[pub] || 0) + 1;
-                            }
-                        });
-                    }
-                });
-            }
+        // 4. Build detail rows for the table
+        const detailRows = filteredEntries.map(entry => {
+            const dateFormatted = dayjs(entry.date).format('dddd D MMMM');
+            const startTimeFormatted = dayjs(entry.startTime.toDate()).format('HH:mm');
+            const endTimeFormatted = dayjs(entry.endTime.toDate()).format('HH:mm');
+            const timeRange = `${startTimeFormatted} - ${endTimeFormatted}`;
+            const durationFormatted = formatDuration(entry.duration);
+            
+            // Gather all publications (generic + from contacts)
+            const allPubs: string[] = [];
             if (entry.deliveredPublications) {
-                entry.deliveredPublications.forEach(pub => {
-                    if (pubsCount[pub] !== undefined) {
-                        pubsCount[pub]++;
-                    } else {
-                        pubsCount[pub] = (pubsCount[pub] || 0) + 1;
+                allPubs.push(...entry.deliveredPublications);
+            }
+            if (entry.contacts) {
+                entry.contacts.forEach(c => {
+                    if (c.deliveredPublications) {
+                        allPubs.push(...c.deliveredPublications);
                     }
                 });
             }
-        });
+            const pubsString = allPubs.length > 0 ? allPubs.join(', ') : '-';
 
-        const tableBody = Object.entries(pubsCount)
-            .filter(([_, count]) => count > 0)
-            .map(([title, count]) => [title, count.toString()]);
+            return {
+                dateFormatted,
+                timeRange,
+                durationFormatted,
+                pubsString,
+                duration: entry.duration
+            };
+        });
             
         return {
             start, 
             end,
             totalSeconds,
             rolesString,
-            tableBody,
             totalEntriesCount,
-            coveredMonthDates
+            detailRows
         };
-    }, [dateRange, entries, rolesMap, catalog]);
+    }, [dateRange, entries, rolesMap]);
 
-    const handleGeneratePDF = async () => {
+    const handleGeneratePDF = () => {
         if (!user || !reportData) return;
         
-        const { start, end, totalSeconds, rolesString, tableBody } = reportData;
+        const { start, end, totalSeconds, rolesString, detailRows } = reportData;
 
         // Start PDF
         const doc = new jsPDF();
         
         // Graphic Header
-        doc.setFillColor(51, 154, 240); // Base Blue color
+        doc.setFillColor(51, 154, 240);
         doc.rect(0, 0, 210, 25, 'F');
         
         doc.setTextColor(255, 255, 255);
@@ -192,18 +140,17 @@ export default function ReportView({ entries }: ReportViewProps) {
         doc.setFontSize(10);
         doc.text(`Generato: ${dayjs().format('DD/MM/YYYY HH:mm')}`, 155, 17);
         
-        // Summary Table
+        // 1st Table: User Info
         autoTable(doc, {
             startY: 40,
-            head: [['Riepilogo Dati', '']],
+            head: [['Riepilogo', '']],
             body: [
                 ['Nome', user.displayName || 'Utente'],
                 ['Periodo', `dal ${start.format('DD/MM/YYYY')} al ${end.format('DD/MM/YYYY')}`],
                 ['Ruolo/i', rolesString],
-                ['Ore Totali', formatTimeHours(totalSeconds)],
             ],
             theme: 'grid',
-            headStyles: { fillColor: [73, 80, 87], halign: 'center' }, // Dark gray
+            headStyles: { fillColor: [73, 80, 87], halign: 'center' },
             columnStyles: { 
                 0: { fontStyle: 'bold', cellWidth: 50 },
                 1: { cellWidth: 130 }
@@ -211,51 +158,46 @@ export default function ReportView({ entries }: ReportViewProps) {
             styles: { fontSize: 12 }
         });
 
-        // Current Y position after table
-        const finalY = (doc as any).lastAutoTable.finalY + 15;
+        let currentY = (doc as any).lastAutoTable.finalY + 10;
 
-        // Publications Table
-        if (tableBody.length > 0) {
-            autoTable(doc, {
-                startY: finalY,
-                head: [['Pubblicazioni Consegnate', 'Quantità']],
-                body: tableBody,
-                theme: 'striped',
-                headStyles: { fillColor: [51, 154, 240] },
-                columnStyles: {
-                    1: { halign: 'center', cellWidth: 40 }
-                },
-                styles: { fontSize: 11 }
-            });
-        } else {
-            doc.setTextColor(100);
-            doc.setFontSize(12);
-            doc.text("Nessuna pubblicazione registrata in questo periodo.", 14, finalY);
-        }
-        
-        // Capture calendar
-        const calendarContainer = document.getElementById('hidden-calendars');
-        if (calendarContainer) {
-            try {
-                const canvas = await html2canvas(calendarContainer, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/png');
-                
-                const pdfWidth = doc.internal.pageSize.getWidth() - 28; // 14 padding on each side
-                const imgProps = doc.getImageProperties(imgData);
-                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                
-                const spaceLeft = doc.internal.pageSize.getHeight() - finalY;
-                
-                if (imgHeight > spaceLeft - 10 && finalY > 60) {
-                     doc.addPage();
-                     doc.addImage(imgData, 'PNG', 14, 20, pdfWidth, imgHeight);
-                } else {
-                     doc.addImage(imgData, 'PNG', 14, finalY + 15, pdfWidth, imgHeight);
-                }
-            } catch (e) {
-                console.error("Failed to capture calendar for PDF", e);
-            }
-        }
+        // 2nd Table: Detailed service entries
+        const tableRows = detailRows.map(row => [
+            row.dateFormatted,
+            row.timeRange,
+            row.durationFormatted,
+            row.pubsString,
+        ]);
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Data', 'Orario', 'Tempo', 'Pubblicazioni']],
+            body: tableRows,
+            theme: 'striped',
+            headStyles: { fillColor: [51, 154, 240] },
+            columnStyles: {
+                0: { cellWidth: 55 },
+                1: { cellWidth: 30, halign: 'center' },
+                2: { cellWidth: 25, halign: 'center' },
+                3: { cellWidth: 'auto' }
+            },
+            styles: { fontSize: 10 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+
+        // Total at the bottom
+        autoTable(doc, {
+            startY: currentY,
+            body: [
+                ['TEMPO TOTALE', formatTimeHours(totalSeconds)],
+            ],
+            theme: 'plain',
+            columnStyles: {
+                0: { fontStyle: 'bold', fontSize: 14, cellWidth: 130 },
+                1: { fontStyle: 'bold', fontSize: 14, halign: 'right', textColor: [51, 154, 240] }
+            },
+            styles: { fontSize: 14 }
+        });
 
         doc.save(`Report_${start.format('DD-MM-YYYY')}_${end.format('DD-MM-YYYY')}.pdf`);
     };
@@ -297,81 +239,50 @@ export default function ReportView({ entries }: ReportViewProps) {
                 </Stack>
             </Paper>
 
-            {/* Hidden Calendars for PDF generation */}
-            {reportData && (
-                <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
-                    <div id="hidden-calendars" style={{ display: 'flex', flexDirection: 'column', padding: '20px', backgroundColor: 'white', width: '800px' }}>
-                        <Title order={4} mb="lg" style={{ textAlign: 'center' }}>
-                            Dettaglio Giornaliero
-                        </Title>
-                        <Group justify="center" align="flex-start" gap="xl" wrap="wrap">
-                            {reportData.coveredMonthDates.map((monthDate, idx) => (
-                                <Stack key={idx} align="center" gap="xs">
-                                    <Text fw={700} tt="capitalize" size="lg">{dayjs(monthDate).format('MMMM YYYY')}</Text>
-                                    <Paper withBorder p="md" radius="md" shadow="sm">
-                                        <Calendar 
-                                            static
-                                            date={monthDate}
-                                            renderDay={(date) => renderDay(date as any)}
-                                            locale="it"
-                                            size="xl"
-                                            styles={{
-                                                day: { borderRadius: 8 },
-                                                calendarHeader: { display: 'none' } // hide internal header
-                                            }}
-                                        />
-                                    </Paper>
-                                </Stack>
-                            ))}
-                        </Group>
-                    </div>
-                </div>
-            )}
-
             {/* Live Preview Panel */}
             {reportData && (
                 <Paper p="md" radius="md" withBorder>
                      <Title order={5} mb="sm">Anteprima Dati Filtrati</Title>
                      
                      <Grid mb="xl" mt="md">
-                         <Grid.Col span={{ base: 6, sm: 3 }}>
+                         <Grid.Col span={{ base: 6, sm: 4 }}>
                              <Text size="sm" c="dimmed">Periodo</Text>
                              <Text fw={500}>{reportData.start.format('DD/MM')} - {reportData.end.format('DD/MM/YYYY')}</Text>
                          </Grid.Col>
-                         <Grid.Col span={{ base: 6, sm: 3 }}>
-                             <Text size="sm" c="dimmed">Ruolo/i</Text>
-                             <Text fw={500} lineClamp={1} title={reportData.rolesString}>{reportData.rolesString}</Text>
-                         </Grid.Col>
-                         <Grid.Col span={{ base: 6, sm: 3 }}>
+                         <Grid.Col span={{ base: 6, sm: 4 }}>
                              <Text size="sm" c="dimmed">Uscite Registrate</Text>
                              <Text fw={500}>{reportData.totalEntriesCount}</Text>
                          </Grid.Col>
-                         <Grid.Col span={{ base: 6, sm: 3 }}>
+                         <Grid.Col span={{ base: 6, sm: 4 }}>
                              <Text size="sm" c="dimmed">Ore Totali</Text>
                              <Text fw={700} c="blue" size="lg">{formatTimeHours(reportData.totalSeconds)}</Text>
                          </Grid.Col>
                      </Grid>
                      
-                     <Title order={6} mb="xs">Pubblicazioni Consegnate in Questo Periodo</Title>
-                     {reportData.tableBody.length > 0 ? (
+                     <Title order={6} mb="xs">Dettaglio Uscite</Title>
+                     {reportData.detailRows.length > 0 ? (
                          <Table striped highlightOnHover withTableBorder>
                              <Table.Thead>
                                  <Table.Tr>
-                                     <Table.Th>Titolo</Table.Th>
-                                     <Table.Th w={100} style={{ textAlign: 'right' }}>Quantità</Table.Th>
+                                     <Table.Th>Data</Table.Th>
+                                     <Table.Th>Orario</Table.Th>
+                                     <Table.Th>Tempo</Table.Th>
+                                     <Table.Th>Pubblicazioni</Table.Th>
                                  </Table.Tr>
                              </Table.Thead>
                              <Table.Tbody>
-                                 {reportData.tableBody.map((row, idx) => (
+                                 {reportData.detailRows.map((row, idx) => (
                                      <Table.Tr key={idx}>
-                                         <Table.Td>{row[0]}</Table.Td>
-                                         <Table.Td style={{ textAlign: 'right' }} fw={500}>{row[1]}</Table.Td>
+                                         <Table.Td tt="capitalize">{row.dateFormatted}</Table.Td>
+                                         <Table.Td>{row.timeRange}</Table.Td>
+                                         <Table.Td>{row.durationFormatted}</Table.Td>
+                                         <Table.Td>{row.pubsString}</Table.Td>
                                      </Table.Tr>
                                  ))}
                              </Table.Tbody>
                          </Table>
                      ) : (
-                         <Text size="sm" c="dimmed" fs="italic">Nessuna pubblicazione consegnata.</Text>
+                         <Text size="sm" c="dimmed" fs="italic">Nessuna uscita trovata nel periodo selezionato.</Text>
                      )}
                 </Paper>
             )}
