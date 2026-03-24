@@ -1,7 +1,9 @@
-import { Modal, Textarea, Button, Group, Stack } from '@mantine/core';
+import { Modal, Textarea, Button, Group, Stack, MultiSelect } from '@mantine/core';
 import { DateInput, TimeInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { subscribeToUserSettings } from '../services/firestore';
+import { useAuth } from '../context/AuthContext';
 import type { ServiceEntry } from '../types';
 import dayjs from 'dayjs';
 import { Timestamp } from 'firebase/firestore';
@@ -20,6 +22,7 @@ export default function EditEntryModal({ opened, onClose, entry, onSave }: EditE
       startTime: '',
       endTime: '',
       notes: '',
+      deliveredPublications: [] as string[],
     },
     validate: {
         startTime: (value: string) => (value ? null : 'Ora inizio richiesta'),
@@ -34,9 +37,21 @@ export default function EditEntryModal({ opened, onClose, entry, onSave }: EditE
             startTime: dayjs(entry.startTime.toDate()).format('HH:mm'),
             endTime: dayjs(entry.endTime.toDate()).format('HH:mm'),
             notes: entry.notes || '',
+            deliveredPublications: entry.deliveredPublications || [],
         });
     }
   }, [entry]);
+
+  const { user } = useAuth();
+  const [catalog, setCatalog] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
+        setCatalog(settings.publicationCatalog || []);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const handleSubmit = async (values: typeof form.values) => {
     if (!entry || !entry.id) return;
@@ -60,6 +75,7 @@ export default function EditEntryModal({ opened, onClose, entry, onSave }: EditE
             endTime: Timestamp.fromDate(endDateTime.toDate()),
             duration: duration,
             notes: values.notes,
+            deliveredPublications: values.deliveredPublications
         });
         onClose();
     } catch (error) {
@@ -97,6 +113,17 @@ export default function EditEntryModal({ opened, onClose, entry, onSave }: EditE
             placeholder="Dettagli attività..."
             {...form.getInputProps('notes')}
             minRows={3}
+          />
+          
+          <MultiSelect
+             label="Pubblicazioni consegnate"
+             placeholder="Seleziona..."
+             data={catalog}
+             searchable
+             clearable
+             maxDropdownHeight={150}
+             comboboxProps={{ withinPortal: true }}
+             {...form.getInputProps('deliveredPublications')}
           />
 
           <Group justify="flex-end" mt="md">

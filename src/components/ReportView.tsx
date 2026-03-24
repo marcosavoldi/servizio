@@ -1,7 +1,8 @@
 import { Stack, Paper, Title, Group, Button, Text, Grid, Table } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { DatePickerInput, Calendar } from '@mantine/dates';
 import { IconFileDescription, IconDownload } from '@tabler/icons-react';
 import { useState, useEffect, useMemo } from 'react';
+import html2canvas from 'html2canvas';
 import { useAuth } from '../context/AuthContext';
 import { subscribeToUserSettings } from '../services/firestore';
 import type { ServiceEntry } from '../types';
@@ -37,6 +38,64 @@ export default function ReportView({ entries }: ReportViewProps) {
         return 'Proclamatore';
     };
 
+    const entriesByDate = useMemo(() => {
+        return entries.reduce((acc, entry) => {
+            if (!acc[entry.date]) acc[entry.date] = [];
+            acc[entry.date].push(entry);
+            return acc;
+        }, {} as Record<string, ServiceEntry[]>);
+    }, [entries]);
+
+    const renderDay = (date: Date) => {
+        const d = dayjs(date);
+        const dateStr = d.format('YYYY-MM-DD');
+        const dayEntries = entriesByDate[dateStr] || [];
+        const hasService = dayEntries.length > 0;
+        const hasContacts = dayEntries.some(e => e.contacts && e.contacts.length > 0);
+        const isToday = d.isSame(dayjs(), 'day');
+        
+        return (
+            <div 
+                style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    position: 'relative',
+                    backgroundColor: isToday ? 'var(--mantine-color-teal-0)' : undefined,
+                    borderRadius: 8
+                }}
+            >
+                <span style={{ 
+                    fontWeight: isToday ? 700 : undefined, 
+                    color: isToday ? 'var(--mantine-color-teal-7)' : undefined 
+                }}>
+                    {d.date()}
+                </span>
+                
+                {/* Indicators Container */}
+                <div style={{ 
+                    position: 'absolute', 
+                    bottom: 4, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: 2, 
+                    width: '100%', 
+                    alignItems: 'center' 
+                }}>
+                    {hasService && (
+                        <div style={{ width: '60%', height: 3, backgroundColor: 'var(--mantine-color-teal-5)', borderRadius: 2 }} />
+                    )}
+                    {hasContacts && (
+                        <div style={{ width: '60%', height: 3, backgroundColor: 'var(--mantine-color-red-5)', borderRadius: 2 }} />
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const reportData = useMemo(() => {
         if (!dateRange[0] || !dateRange[1]) return null;
         
@@ -56,9 +115,11 @@ export default function ReportView({ entries }: ReportViewProps) {
 
         // 3. Gather Roles during this period
         let currentMonthIter = start.startOf('month');
+        const coveredMonthDates: Date[] = [];
         const coveredMonths: string[] = [];
         while (currentMonthIter.isBefore(end) || currentMonthIter.isSame(end, 'month')) {
             coveredMonths.push(currentMonthIter.format('YYYY-MM'));
+            coveredMonthDates.push(currentMonthIter.toDate());
             currentMonthIter = currentMonthIter.add(1, 'month');
         }
         
@@ -86,6 +147,15 @@ export default function ReportView({ entries }: ReportViewProps) {
                     }
                 });
             }
+            if (entry.deliveredPublications) {
+                entry.deliveredPublications.forEach(pub => {
+                    if (pubsCount[pub] !== undefined) {
+                        pubsCount[pub]++;
+                    } else {
+                        pubsCount[pub] = (pubsCount[pub] || 0) + 1;
+                    }
+                });
+            }
         });
 
         const tableBody = Object.entries(pubsCount)
@@ -98,11 +168,12 @@ export default function ReportView({ entries }: ReportViewProps) {
             totalSeconds,
             rolesString,
             tableBody,
-            totalEntriesCount
+            totalEntriesCount,
+            coveredMonthDates
         };
     }, [dateRange, entries, rolesMap, catalog]);
 
-    const handleGeneratePDF = () => {
+    const handleGeneratePDF = async () => {
         if (!user || !reportData) return;
         
         const { start, end, totalSeconds, rolesString, tableBody } = reportData;
@@ -161,6 +232,30 @@ export default function ReportView({ entries }: ReportViewProps) {
             doc.setFontSize(12);
             doc.text("Nessuna pubblicazione registrata in questo periodo.", 14, finalY);
         }
+        
+        // Capture calendar
+        const calendarContainer = document.getElementById('hidden-calendars');
+        if (calendarContainer) {
+            try {
+                const canvas = await html2canvas(calendarContainer, { scale: 2, useCORS: true });
+                const imgData = canvas.toDataURL('image/png');
+                
+                const pdfWidth = doc.internal.pageSize.getWidth() - 28; // 14 padding on each side
+                const imgProps = doc.getImageProperties(imgData);
+                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                const spaceLeft = doc.internal.pageSize.getHeight() - finalY;
+                
+                if (imgHeight > spaceLeft - 10 && finalY > 60) {
+                     doc.addPage();
+                     doc.addImage(imgData, 'PNG', 14, 20, pdfWidth, imgHeight);
+                } else {
+                     doc.addImage(imgData, 'PNG', 14, finalY + 15, pdfWidth, imgHeight);
+                }
+            } catch (e) {
+                console.error("Failed to capture calendar for PDF", e);
+            }
+        }
 
         doc.save(`Report_${start.format('DD-MM-YYYY')}_${end.format('DD-MM-YYYY')}.pdf`);
     };
@@ -201,6 +296,37 @@ export default function ReportView({ entries }: ReportViewProps) {
                     </Button>
                 </Stack>
             </Paper>
+
+            {/* Hidden Calendars for PDF generation */}
+            {reportData && (
+                <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }}>
+                    <div id="hidden-calendars" style={{ display: 'flex', flexDirection: 'column', padding: '20px', backgroundColor: 'white', width: '800px' }}>
+                        <Title order={4} mb="lg" style={{ textAlign: 'center' }}>
+                            Dettaglio Giornaliero
+                        </Title>
+                        <Group justify="center" align="flex-start" gap="xl" wrap="wrap">
+                            {reportData.coveredMonthDates.map((monthDate, idx) => (
+                                <Stack key={idx} align="center" gap="xs">
+                                    <Text fw={700} tt="capitalize" size="lg">{dayjs(monthDate).format('MMMM YYYY')}</Text>
+                                    <Paper withBorder p="md" radius="md" shadow="sm">
+                                        <Calendar 
+                                            static
+                                            date={monthDate}
+                                            renderDay={(date) => renderDay(date as any)}
+                                            locale="it"
+                                            size="xl"
+                                            styles={{
+                                                day: { borderRadius: 8 },
+                                                calendarHeader: { display: 'none' } // hide internal header
+                                            }}
+                                        />
+                                    </Paper>
+                                </Stack>
+                            ))}
+                        </Group>
+                    </div>
+                </div>
+            )}
 
             {/* Live Preview Panel */}
             {reportData && (

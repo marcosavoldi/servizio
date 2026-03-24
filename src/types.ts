@@ -35,6 +35,7 @@ export interface ServiceEntry {
     type: 'timer' | 'manual';
     notes?: string;
     contacts?: Contact[];
+    deliveredPublications?: string[];
     createdAt: Timestamp;
 }
 

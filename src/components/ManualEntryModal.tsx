@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Modal, Button, Textarea, Group, Stack } from '@mantine/core';
+import { Modal, Button, Textarea, Group, Stack, MultiSelect } from '@mantine/core';
 import { DatePickerInput, TimeInput } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { useAuth } from '../context/AuthContext';
-import { addServiceEntry } from '../services/firestore';
+import { addServiceEntry, subscribeToUserSettings } from '../services/firestore';
 import { Timestamp } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import { IconClock } from '@tabler/icons-react';
@@ -20,6 +20,16 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
   const { user } = useAuth();
   const isMobile = useMediaQuery('(max-width: 50em)');
   const [date, setDate] = useState<Date | null>(new Date());
+  const [catalog, setCatalog] = useState<string[]>([]);
+  const [deliveredPublications, setDeliveredPublications] = useState<string[]>([]);
+  
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
+        setCatalog(settings.publicationCatalog || []);
+    });
+    return () => unsubscribe();
+  }, [user]);
   
   useEffect(() => {
     if (opened && initialDate) {
@@ -66,6 +76,7 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
         duration: duration,
         type: 'manual',
         notes: notes.trim(),
+        deliveredPublications: deliveredPublications
       });
 
       const timeoutOp = new Promise(resolve => setTimeout(resolve, 2000));
@@ -75,6 +86,7 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
       onClose();
       // Reset form defaults?
       setNotes('');
+      setDeliveredPublications([]);
     } catch (error) {
       console.error("Error saving manual entry:", error);
       alert("Errore nel salvataggio.");
@@ -123,10 +135,21 @@ export default function ManualEntryModal({ opened, onClose, onEntrySaved, initia
                 />
             </Group>
              <Textarea
-                 label="Note"
+                 label="Note (opzionali)"
                  placeholder="Dettagli..."
                  value={notes}
                  onChange={(e) => setNotes(e.currentTarget.value)}
+              />
+             <MultiSelect
+                 label="Pubblicazioni consegnate"
+                 placeholder="Seleziona..."
+                 data={catalog}
+                 value={deliveredPublications}
+                 onChange={setDeliveredPublications}
+                 searchable
+                 clearable
+                 maxDropdownHeight={150}
+                 comboboxProps={{ withinPortal: true }}
               />
             <Group justify="flex-end" mt="md">
                 <Button variant="subtle" color="gray" onClick={onClose} disabled={saving}>Annulla</Button>

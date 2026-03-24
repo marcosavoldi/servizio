@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Text, Group, ActionIcon, Modal, Stack, Textarea, ThemeIcon, Divider, Badge } from '@mantine/core';
+import { Button, Card, Text, Group, ActionIcon, Modal, Stack, Textarea, ThemeIcon, Divider, Badge, MultiSelect } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconChecks, IconUserPlus, IconUser, IconClock } from '@tabler/icons-react';
 import { useAuth } from '../context/AuthContext';
-import { addServiceEntry, saveTimerSession, deleteTimerSession, subscribeToActiveTimer, addGlobalContact } from '../services/firestore';
+import { addServiceEntry, saveTimerSession, deleteTimerSession, subscribeToActiveTimer, addGlobalContact, subscribeToUserSettings } from '../services/firestore';
 import { Timestamp } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import { formatTime } from '../utils/formatUtils';
@@ -19,6 +19,7 @@ interface TimerState {
     accumulatedTime: number;
     notes: string;
     tempContacts: Contact[];
+    tempPublications?: string[];
 }
 
 export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetProps) {
@@ -36,7 +37,18 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
     const [notes, setNotes] = useState('');
     const [saving, setSaving] = useState(false);
     const [tempContacts, setTempContacts] = useState<Contact[]>([]);
+    const [tempPublications, setTempPublications] = useState<string[]>([]);
+    const [catalog, setCatalog] = useState<string[]>([]);
     const [contactModalOpen, setContactModalOpen] = useState(false);
+
+    // Fetch catalog
+    useEffect(() => {
+        if (!user) return;
+        const unsubscribe = subscribeToUserSettings(user.uid, (settings) => {
+            setCatalog(settings.publicationCatalog || []);
+        });
+        return () => unsubscribe();
+    }, [user]);
 
     // Cloud Sync: Subscribe to active timer
     useEffect(() => {
@@ -56,6 +68,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                 // We overwrite local state to keep in sync.
                 if (saved.notes) setNotes(saved.notes);
                 if (saved.tempContacts) setTempContacts(saved.tempContacts);
+                if (saved.tempPublications) setTempPublications(saved.tempPublications);
 
                 if (saved.status === 'running' && saved.startTime) {
                     const currentSession = Math.floor((Date.now() - saved.startTime) / 1000);
@@ -87,6 +100,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
             accumulatedTime,
             notes,
             tempContacts,
+            tempPublications,
             ...newState
         };
         saveTimerSession(user.uid, currentRefState);
@@ -146,6 +160,7 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
         startTimeRef.current = null;
         setNotes('');
         setTempContacts([]);
+        setTempPublications([]);
         setIsModalOpen(false);
         setStatus('idle');
         if (user) deleteTimerSession(user.uid);
@@ -168,7 +183,8 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                 duration: finalTime,
                 type: 'timer',
                 notes: notes.trim(),
-                contacts: tempContacts
+                contacts: tempContacts,
+                deliveredPublications: tempPublications
             });
 
             const timeoutOp = new Promise(resolve => setTimeout(resolve, 2000));
@@ -342,6 +358,21 @@ export default function ServiceTimerWidget({ onEntrySaved }: ServiceTimerWidgetP
                             ))}
                          </Stack>
                     )}
+
+                    <MultiSelect
+                        label="Pubblicazioni consegnate"
+                        placeholder="Nessuna..."
+                        data={catalog}
+                        value={tempPublications}
+                        onChange={(vals) => {
+                             setTempPublications(vals);
+                             syncToCloud({ tempPublications: vals });
+                        }}
+                        searchable
+                        clearable
+                        maxDropdownHeight={150}
+                        w="100%"
+                    />
 
                     <Button 
                         variant="subtle" 
